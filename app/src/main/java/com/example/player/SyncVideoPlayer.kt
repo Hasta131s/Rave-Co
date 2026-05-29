@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Close
@@ -357,6 +359,7 @@ fun ExoPlayerCompose(
     var selectedQualityUrl by remember(videoUrl) { mutableStateOf(videoUrl) }
     var selectedQualityLabel by remember(videoUrl) { mutableStateOf("Varsayılan") }
     var showQualityMenu by remember { mutableStateOf(false) }
+    var showQuickMsgPanel by remember { mutableStateOf(false) }
 
     LaunchedEffect(videoUrl) {
         checkUrlQuality(videoUrl) { qList ->
@@ -558,6 +561,20 @@ fun ExoPlayerCompose(
                     tint = Color.White
                 )
             }
+            if (isFullscreen) {
+                IconButton(
+                    onClick = { showQuickMsgPanel = !showQuickMsgPanel },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (showQuickMsgPanel) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.6f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChatBubble,
+                        contentDescription = "Hazır Mesajlar",
+                        tint = if (showQuickMsgPanel) Color.Black else Color.White
+                    )
+                }
+            }
 
             IconButton(
                 onClick = isFullscreenToggle,
@@ -572,23 +589,37 @@ fun ExoPlayerCompose(
         }
 
         // FULLSCREEN QUICK MESSAGES / TEASER OVERLAY (Request 8)
-        if (isFullscreen) {
+        if (isFullscreen && showQuickMsgPanel) {
             val quickMessages = listOf("vayamk", "tmm", "evet", "ayn", "✔️", "hyr", "süper", "şaka")
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 60.dp) // Safely above system gesture/exo bottom bars
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Hazır Mesaj Gönder",
-                    color = Color.LightGray,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
+            Box(modifier = Modifier.fillMaxSize().padding(bottom = 60.dp), contentAlignment = Alignment.BottomCenter) {
+                Column(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Spacer(modifier = Modifier.width(20.dp))
+                    Text(
+                        text = "Hazır Mesaj Gönder",
+                        color = Color.LightGray,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Kapat",
+                        tint = Color.LightGray,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable { showQuickMsgPanel = false }
+                    )
+                }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -601,15 +632,16 @@ fun ExoPlayerCompose(
                                     syncState?.roomId?.let { rid ->
                                         viewModel.sendRoomMessage(roomId = rid, msg = msg)
                                         viewModel.showToast("\"$msg\" gönderildi.")
+                                        showQuickMsgPanel = false // auto close on press
                                     }
                                 }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = msg,
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                  text = msg,
+                                  color = Color.White,
+                                  fontSize = 12.sp,
+                                  fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -617,6 +649,7 @@ fun ExoPlayerCompose(
             }
         }
     }
+}
 }
 
 @Composable

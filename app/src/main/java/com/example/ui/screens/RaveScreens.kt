@@ -329,7 +329,7 @@ fun LoginScreen(viewModel: RaveViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -426,7 +426,7 @@ fun RegisterScreen(viewModel: RaveViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -594,13 +594,13 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Oda Oluştur")
             }
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             RaveSyncStatusBar()
 
@@ -799,44 +799,49 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     var msgToTargetPid by remember { mutableStateOf<com.example.data.model.RoomParticipant?>(null) }
     val context = LocalContext.current
 
-    DisposableEffect(isFullscreen) {
+    DisposableEffect(Unit) {
         val activity = context as? android.app.Activity
         if (activity != null) {
-            if (isFullscreen) {
-                activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    activity.window.decorView.windowInsetsController?.let { controller ->
-                        controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                        controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    activity.window.decorView.systemUiVisibility = (
-                        android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
-                        android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                        android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    )
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                activity.window.decorView.windowInsetsController?.let { controller ->
+                    controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                    controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 }
             } else {
-                activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    activity.window.decorView.windowInsetsController?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                } else {
-                    @Suppress("DEPRECATION")
-                    activity.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
-                }
+                @Suppress("DEPRECATION")
+                activity.window.decorView.systemUiVisibility = (
+                    android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
             }
         }
         onDispose {
             val act = context as? android.app.Activity
             if (act != null) {
-                act.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                     act.window.decorView.windowInsetsController?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
                 } else {
                     @Suppress("DEPRECATION")
                     act.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
                 }
+            }
+        }
+    }
+
+    DisposableEffect(isFullscreen) {
+        val activity = context as? android.app.Activity
+        if (activity != null) {
+            if (isFullscreen) {
+                activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            } else {
+                activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+        onDispose {
+            val act = context as? android.app.Activity
+            if (act != null) {
+                act.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
     }
@@ -869,12 +874,12 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     val isOwnerOrMod = sync.myRole == "owner" || sync.myRole == "moderator"
 
     Scaffold(
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Player Area (Tops)
             SyncVideoPlayer(
@@ -1908,13 +1913,13 @@ fun FriendsScreen(viewModel: RaveViewModel) {
                 onBackClick = { viewModel.navigateBack() }
             )
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(16.dp)
         ) {
             // Send Request Box
@@ -2100,13 +2105,13 @@ fun DmsListScreen(viewModel: RaveViewModel) {
                 onBackClick = { viewModel.navigateBack() }
             )
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             if (conversations.isEmpty()) {
                 Column(
@@ -2236,13 +2241,13 @@ fun DmChatScreen(
                 }
             )
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             LazyColumn(
                 state = listState,
@@ -2420,13 +2425,13 @@ fun ProfileScreen(viewModel: RaveViewModel) {
                 onBackClick = { viewModel.navigateBack() }
             )
         },
-        containerColor = Color.Black
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -2713,6 +2718,7 @@ fun VideoSelectorTabs(
     // YouTube search states
     var ytQuery by remember { mutableStateOf("") }
     var searchedVideos by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
     
     // Shared content add form states
     var showAddForm by remember { mutableStateOf(false) }
@@ -2777,39 +2783,40 @@ fun VideoSelectorTabs(
                             ),
                             modifier = Modifier.weight(1f)
                         )
+                        val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
                         Button(
                             onClick = {
-                                if (ytQuery.isNotBlank()) {
-                                    val queryLower = ytQuery.lowercase().trim()
-                                    val results = mutableListOf<Pair<String, String>>()
-                                    if (queryLower.contains("lofi") || queryLower.contains("müzik") || queryLower.contains("music") || queryLower.contains("relax")) {
-                                        results.add("https://www.youtube.com/watch?v=jfKfPfyJRdk" to "Lofi Girl - Chill Beats To Relax/Study to Live")
-                                        results.add("https://www.youtube.com/watch?v=5qap5aO4i9A" to "Lofi Hip Hop Radio 24/7 - Beats to Sleep")
-                                        results.add("https://www.youtube.com/watch?v=4xDzrJKXOOY" to "Synthwave Radio 24/7 - Retrowave Live Stream")
-                                    } else if (queryLower.contains("bunny") || queryLower.contains("tavşan") || queryLower.contains("animasyon")) {
-                                        results.add("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" to "Big Buck Bunny Full HD (Animasyon)")
-                                    } else if (queryLower.contains("uzay") || queryLower.contains("space") || queryLower.contains("earth")) {
-                                        results.add("https://www.youtube.com/watch?v=P9C25Un7xaM" to "NASA Live Earth From Space ISS Stream")
-                                        results.add("https://www.youtube.com/watch?v=21X5lGlDOfg" to "Stunning Space Footage & Chill Music Journey")
-                                    } else {
-                                        results.add("https://www.youtube.com/watch?v=dQw4w9WgXcQ" to "Rick Astley - Never Gonna Give You Up (Classic)")
-                                        results.add("https://www.youtube.com/watch?v=jfKfPfyJRdk" to "Lofi Girl Chill Beats (Arama: $ytQuery)")
-                                        results.add("https://www.youtube.com/watch?v=N6O_fguS6b0" to "Marvel Cinematic Ambient Soundscapes HD ($ytQuery)")
-                                        results.add("https://www.youtube.com/watch?v=21X5lGlDOfg" to "Epic Cinematic Space Discovery HD ($ytQuery)")
+                                if (ytQuery.isNotBlank() && !isSearching) {
+                                    isSearching = true
+                                    viewModel.searchYouTube(ytQuery) { results ->
+                                        searchedVideos = results.map { it.url to it.title }
+                                        isSearching = false
+                                        keyboardController?.hide()
                                     }
-                                    searchedVideos = results
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
-                            shape = RoundedCornerShape(4.dp)
+                            shape = RoundedCornerShape(4.dp),
+                            enabled = !isSearching
                         ) {
-                            Text("Ara", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            if (isSearching) {
+                                CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(14.dp), strokeWidth = 1.5.dp)
+                            } else {
+                                Text("Ara", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    if (searchedVideos.isEmpty()) {
+                    if (isSearching) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(130.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        }
+                    } else if (searchedVideos.isEmpty()) {
                         Text("Buradan YouTube videosu aratabilir ve doğrudan odanıza yükleyebilirsiniz.", color = Color.Gray, fontSize = 10.sp)
                     } else {
                         LazyColumn(

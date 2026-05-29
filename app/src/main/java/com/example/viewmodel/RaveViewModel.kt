@@ -169,6 +169,23 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun searchYouTube(query: String, onResult: (List<com.example.data.model.SearchVideoItem>) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                val resp = service.searchYouTube(body = mapOf("query" to query))
+                if (resp.success && resp.videos != null) {
+                    onResult(resp.videos)
+                } else {
+                    onResult(emptyList())
+                }
+            } catch (e: Exception) {
+                Log.e("RaveCo", "Failed to search YouTube", e)
+                onResult(emptyList())
+            }
+        }
+    }
+
     fun setAppTheme(themeName: String) {
         _appTheme.value = themeName
         context.getSharedPreferences("rave_settings", Context.MODE_PRIVATE).edit()

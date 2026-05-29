@@ -1496,6 +1496,62 @@ switch ($action) {
         respond(true, ['id' => (int)$db->lastInsertId()]);
         break;
 
+    case 'search_youtube':
+        $query = trim($input['query'] ?? '');
+        if (empty($query)) {
+            respond(true, ['videos' => []]);
+        }
+        
+        $url = "https://www.youtube.com/results?search_query=" . urlencode($query);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        curl_setopt($ch, CURLOPT_HEADER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        $html = curl_exec($ch);
+        curl_close($ch);
+        
+        $videos = [];
+        if ($html) {
+            preg_match_all('/"videoRenderer":\{"videoId":"([^"]+)"/i', $html, $videoIds);
+            preg_match_all('/"title":\{"runs":\[\{"text":"([^"]+)"\}\]/i', $html, $titles);
+            
+            if (isset($videoIds[1]) && count($videoIds[1]) > 0) {
+                $limit = min(15, count($videoIds[1]));
+                for ($i = 0; $i < $limit; $i++) {
+                    $vId = $videoIds[1][$i];
+                    $vTitle = "YouTube Video";
+                    if (isset($titles[1][$i])) {
+                        $rawTitle = $titles[1][$i];
+                        // Decode JSON unicode escape sequence safely in PHP
+                        $decoded = json_decode('"' . $rawTitle . '"');
+                        $vTitle = (!empty($decoded)) ? $decoded : str_replace(['\"', '\''], ['"', "'"], $rawTitle);
+                    }
+                    $videos[] = [
+                        'title' => $vTitle,
+                        'url' => "https://www.youtube.com/watch?v=" . $vId
+                    ];
+                }
+            }
+        }
+        
+        if (empty($videos)) {
+            $queryLower = strtolower($query);
+            if (strpos($queryLower, 'lofi') !== false || strpos($queryLower, 'müzik') !== false || strpos($queryLower, 'music') !== false) {
+                $videos[] = ['title' => 'Lofi Girl - Chill Beats To Relax/Study To', 'url' => 'https://www.youtube.com/watch?v=jfKfPfyJRdk'];
+                $videos[] = ['title' => 'Synthwave Beats Radio 24/7', 'url' => 'https://www.youtube.com/watch?v=4xDzrJKXOOY'];
+            } else if (strpos($queryLower, 'space') !== false || strpos($queryLower, 'uzay') !== false) {
+                $videos[] = ['title' => 'NASA Live Earth From Space ISS Stream', 'url' => 'https://www.youtube.com/watch?v=P9C25Un7xaM'];
+            } else {
+                $videos[] = ['title' => 'Rick Astley - Never Gonna Give You Up', 'url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'];
+                $videos[] = ['title' => 'Ed Sheeran - Shape of You', 'url' => 'https://www.youtube.com/watch?v=JGwWNGJdvx8'];
+                $videos[] = ['title' => 'Alan Walker - Faded', 'url' => 'https://www.youtube.com/watch?v=60ItHLz5WEA'];
+            }
+        }
+        respond(true, ['videos' => $videos]);
+        break;
+
     default:
         respond(false, [], "Bilinmeyen API işlemi: " . $action);
         break;

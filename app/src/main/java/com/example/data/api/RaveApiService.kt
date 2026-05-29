@@ -158,6 +158,12 @@ interface RaveApiService {
         @Query("action") action: String = "add_shared_content",
         @Body body: Map<String, String>
     ): BaseResponse
+
+    @POST("api.php")
+    suspend fun searchYouTube(
+        @Query("action") action: String = "search_youtube",
+        @Body body: Map<String, String>
+    ): SearchYouTubeResponse
 }
 
 object RaveApiFactory {

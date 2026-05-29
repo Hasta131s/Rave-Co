@@ -198,3 +198,17 @@ data class SharedContentsResponse(
     val error: String? = null,
     val contents: List<SharedContent>? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class SearchVideoItem(
+    val title: String,
+    val url: String
+)
+
+@JsonClass(generateAdapter = true)
+data class SearchYouTubeResponse(
+    val success: Boolean,
+    val error: String? = null,
+    val videos: List<SearchVideoItem>? = null
+)
+
