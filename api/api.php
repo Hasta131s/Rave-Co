@@ -187,6 +187,21 @@ try {
             PRIMARY KEY (room_id, user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     }
+
+    // ALTER room_messages to support replies and deletions on both SQLite and MySQL
+    try {
+        $db->exec("ALTER TABLE room_messages ADD COLUMN reply_to_id INT DEFAULT NULL;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE room_messages ADD COLUMN reply_to_name VARCHAR(255) DEFAULT NULL;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE room_messages ADD COLUMN reply_to_msg TEXT DEFAULT NULL;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE room_messages ADD COLUMN is_deleted INT DEFAULT 0;");
+    } catch (Exception $e) {}
+
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'error' => 'Database initialization error: ' . $e->getMessage()]);
     exit();
@@ -555,7 +570,7 @@ switch ($action) {
                 $stmt_next_name->execute([':id' => $next['user_id']]);
                 $next_name = $stmt_next_name->fetchColumn() ?: 'User';
                 
-                $sys_transfer = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, 0, :msg, 1, :ts)");
+                $sys_transfer = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, NULL, :msg, 1, :ts)");
                 $sys_transfer->execute([
                     ':rid' => $roomId,
                     ':msg' => "system_transfer:" . $next_name,
@@ -635,7 +650,7 @@ switch ($action) {
                     $params[':vt'] = $v_title;
                     
                     // Add message
-                    $sys_vid = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, 0, :msg, 1, :ts)");
+                    $sys_vid = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, NULL, :msg, 1, :ts)");
                     $sys_vid->execute([
                         ':rid' => $roomId,
                         ':msg' => "system_video:" . $v_title,
@@ -680,15 +695,18 @@ switch ($action) {
             ];
         }
         
-        // 5. Fetch New Messages
+        // 5. Fetch Latest 100 Messages (Chronological ascending)
         $stmt_msgs = $db->prepare("
             SELECT rm.*, u.username as sender_name, u.avatar as sender_avatar
-            FROM room_messages rm
+            FROM (
+                SELECT * FROM room_messages 
+                WHERE room_id = :rid 
+                ORDER BY id DESC LIMIT 100
+            ) rm
             LEFT JOIN users u ON rm.user_id = u.id
-            WHERE rm.room_id = :rid AND rm.id > :lmid
             ORDER BY rm.id ASC
         ");
-        $stmt_msgs->execute([':rid' => $roomId, ':lmid' => $lastMessageId]);
+        $stmt_msgs->execute([':rid' => $roomId]);
         $new_messages_raw = $stmt_msgs->fetchAll(PDO::FETCH_ASSOC);
         
         $new_messages = [];
@@ -701,7 +719,11 @@ switch ($action) {
                 'senderAvatar' => $m['sender_avatar'] ?: 'avatar1',
                 'message' => $m['message'],
                 'isSystem' => (int)$m['is_system'] === 1,
-                'timestamp' => (int)$m['timestamp']
+                'timestamp' => (int)$m['timestamp'],
+                'isDeleted' => isset($m['is_deleted']) ? (int)$m['is_deleted'] === 1 : false,
+                'replyToId' => isset($m['reply_to_id']) ? (int)$m['reply_to_id'] : null,
+                'replyToName' => isset($m['reply_to_name']) ? $m['reply_to_name'] : null,
+                'replyToMsg' => isset($m['reply_to_msg']) ? $m['reply_to_msg'] : null
             ];
         }
         
@@ -742,15 +764,59 @@ switch ($action) {
             respond(false, [], "Sessize alındınız (Sohbet edemezsiniz).");
         }
         
-        $stmt = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, :uid, :msg, 0, :ts)");
+        $replyToId = isset($input['replyToId']) ? (int)$input['replyToId'] : null;
+        $replyToName = isset($input['replyToName']) ? trim($input['replyToName']) : null;
+        $replyToMsg = isset($input['replyToMsg']) ? trim($input['replyToMsg']) : null;
+
+        $stmt = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp, reply_to_id, reply_to_name, reply_to_msg) VALUES (:rid, :uid, :msg, 0, :ts, :rtid, :rtname, :rtmsg)");
         $stmt->execute([
             ':rid' => $roomId,
             ':uid' => $userId,
             ':msg' => $message,
-            ':ts' => time()
+            ':ts' => time(),
+            ':rtid' => $replyToId,
+            ':rtname' => $replyToName,
+            ':rtmsg' => $replyToMsg
         ]);
         
         respond(true, ['messageId' => (int)$db->lastInsertId()]);
+        break;
+
+    case 'delete_room_message':
+        $userId = (int)($input['userId'] ?? 0);
+        $roomId = (int)($input['roomId'] ?? 0);
+        $messageId = (int)($input['messageId'] ?? 0);
+        
+        if ($userId <= 0 || $roomId <= 0 || $messageId <= 0) {
+            respond(false, [], "Geçersiz silme verisi.");
+        }
+        
+        // Fetch message to verify owner or authority
+        $stmt_msg = $db->prepare("SELECT * FROM room_messages WHERE id = :mid AND room_id = :rid");
+        $stmt_msg->execute([':mid' => $messageId, ':rid' => $roomId]);
+        $msg = $stmt_msg->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$msg) {
+            respond(false, [], "Mesaj bulunamadı.");
+        }
+        
+        // Fetch current user's role in the room to check if they are owner or moderator
+        $stmt_my = $db->prepare("SELECT role FROM room_participants WHERE room_id = :rid AND user_id = :uid");
+        $stmt_my->execute([':rid' => $roomId, ':uid' => $userId]);
+        $my_role = $stmt_my->fetchColumn();
+        
+        $is_owner_or_mod = ($my_role === 'owner' || $my_role === 'moderator');
+        $is_message_author = ((int)$msg['user_id'] === $userId);
+        
+        if (!$is_message_author && !$is_owner_or_mod) {
+            respond(false, [], "Bu mesajı silme yetkiniz yok.");
+        }
+        
+        // Set message as deleted in databases
+        $upd = $db->prepare("UPDATE room_messages SET is_deleted = 1, message = 'Bu mesaj silindi.' WHERE id = :mid");
+        $upd->execute([':mid' => $messageId]);
+        
+        respond(true, ['message' => 'Mesaj silindi.']);
         break;
 
     case 'room_moderate':
@@ -840,7 +906,7 @@ switch ($action) {
         
         // Insert system message about action
         if (!empty($sys_msg)) {
-            $sys_stmt = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, 0, :msg, 1, :ts)");
+            $sys_stmt = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, NULL, :msg, 1, :ts)");
             $sys_stmt->execute([
                 ':rid' => $roomId,
                 ':msg' => $sys_msg,

@@ -76,6 +76,12 @@ interface RaveApiService {
     ): BaseResponse
 
     @POST("api.php")
+    suspend fun deleteRoomMessage(
+        @Query("action") action: String = "delete_room_message",
+        @Body body: Map<String, @JvmSuppressWildcards Any>
+    ): BaseResponse
+
+    @POST("api.php")
     suspend fun moderateRoom(
         @Query("action") action: String = "room_moderate",
         @Body body: Map<String, @JvmSuppressWildcards Any>

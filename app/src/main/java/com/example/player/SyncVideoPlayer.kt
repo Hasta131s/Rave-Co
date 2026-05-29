@@ -39,6 +39,60 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.font.FontWeight
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.graphics.SolidColor
+
+val IconFullscreen = ImageVector.Builder(
+    name = "Fullscreen",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).path(
+    fill = null,
+    stroke = SolidColor(Color.White),
+    strokeLineWidth = 2f
+) {
+    moveTo(4f, 9f)
+    lineTo(4f, 4f)
+    lineTo(9f, 4f)
+    moveTo(20f, 9f)
+    lineTo(20f, 4f)
+    lineTo(15f, 4f)
+    moveTo(4f, 15f)
+    lineTo(4f, 20f)
+    lineTo(9f, 20f)
+    moveTo(20f, 15f)
+    lineTo(20f, 20f)
+    lineTo(15f, 20f)
+}.build()
+
+val IconFullscreenExit = ImageVector.Builder(
+    name = "FullscreenExit",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).path(
+    fill = null,
+    stroke = SolidColor(Color.White),
+    strokeLineWidth = 2f
+) {
+    moveTo(4f, 8f)
+    lineTo(8f, 8f)
+    lineTo(8f, 4f)
+    moveTo(20f, 8f)
+    lineTo(16f, 8f)
+    lineTo(16f, 4f)
+    moveTo(4f, 16f)
+    lineTo(8f, 16f)
+    lineTo(8f, 20f)
+    moveTo(20f, 16f)
+    lineTo(16f, 16f)
+    lineTo(16f, 20f)
+}.build()
+
 fun extractYouTubeId(url: String): String? {
     val cleanUrl = url.trim()
     val pattern = "(?i)(?:https?:\\/\\/)?(?:www\\.)?(?:youtube\\.com\\/(?:[^\\/\\n\\s]+\\/\\S+\\/|(?:v|e(?:mbed)?)\\/|\\S*?[?&]v=)|youtu\\.be\\/)([a-zA-Z0-9_-]{11})"
@@ -60,7 +114,7 @@ fun SyncVideoPlayer(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(if (isFullscreen) MatchParentHeight() else 230.dp)
+            .then(if (isFullscreen) Modifier.fillMaxHeight() else Modifier.height(230.dp))
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
@@ -238,47 +292,64 @@ fun YouTubePlayerCompose(
         }
     }
 
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
-            WebView(ctx).apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                settings.apply {
-                    javaScriptEnabled = true
-                    mediaPlaybackRequiresUserGesture = false
-                    domStorageEnabled = true
-                    useWideViewPort = true
-                    loadWithOverviewMode = true
-                }
-                
-                webChromeClient = WebChromeClient()
-                
-                // Add interface to bridge play state to our ViewModel authority
-                addJavascriptInterface(object {
-                    @JavascriptInterface
-                    fun onStateChanged(time: Float, playing: Boolean) {
-                        viewModel.currentPlaybackTime = time
-                        viewModel.isPlaying = playing
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    settings.apply {
+                        javaScriptEnabled = true
+                        mediaPlaybackRequiresUserGesture = false
+                        domStorageEnabled = true
+                        useWideViewPort = true
+                        loadWithOverviewMode = true
                     }
-                }, "AndroidNative")
+                    
+                    webChromeClient = WebChromeClient()
+                    
+                    // Add interface to bridge play state to our ViewModel authority
+                    addJavascriptInterface(object {
+                        @JavascriptInterface
+                        fun onStateChanged(time: Float, playing: Boolean) {
+                            viewModel.currentPlaybackTime = time
+                            viewModel.isPlaying = playing
+                        }
+                    }, "AndroidNative")
 
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        super.onPageFinished(view, url)
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                        }
                     }
-                }
 
-                loadDataWithBaseURL("https://www.youtube.com", htmlContent, "text/html", "utf-8", null)
-                webViewRef = this
+                    loadDataWithBaseURL("https://www.youtube.com", htmlContent, "text/html", "utf-8", null)
+                    webViewRef = this
+                }
+            },
+            update = {
+                // Updated
             }
-        },
-        update = {
-            // Updated
+        )
+
+        // Floating full-screen toggle overlay on top of YouTube Player WebView
+        IconButton(
+            onClick = isFullscreenToggle,
+            colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.6f)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+        ) {
+            Icon(
+                imageVector = if (isFullscreen) IconFullscreenExit else IconFullscreen,
+                contentDescription = "Tam Ekran",
+                tint = Color.White
+            )
         }
-    )
+    }
 }
 
 @OptIn(UnstableApi::class)
@@ -425,6 +496,17 @@ fun ExoPlayerCompose(
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Yeniden Senkronize Et",
+                    tint = Color.White
+                )
+            }
+
+            IconButton(
+                onClick = isFullscreenToggle,
+                colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.6f))
+            ) {
+                Icon(
+                    imageVector = if (isFullscreen) IconFullscreenExit else IconFullscreen,
+                    contentDescription = "Tam Ekran",
                     tint = Color.White
                 )
             }

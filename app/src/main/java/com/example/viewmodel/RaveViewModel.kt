@@ -357,36 +357,25 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                     val resp = service.roomSync(body = payload)
                     if (resp.success && resp.sync != null) {
                         val newSync = resp.sync
-                        
-                        // Append and cache new messages
                         val prevSync = _roomSyncState.value
-                        val aggregatedMessages = if (prevSync != null && lastMsgId > 0) {
-                            val existing = prevSync.newMessages.toMutableList()
-                            val fresh = newSync.newMessages.filter { m -> existing.none { it.id == m.id } }
-                            existing.addAll(fresh)
-                            existing
-                        } else {
-                            newSync.newMessages
-                        }
-
-                        // Adjust last known message
-                        if (aggregatedMessages.isNotEmpty()) {
-                            lastMsgId = aggregatedMessages.maxOf { it.id }
-                        }
-
-                        _roomSyncState.value = newSync.copy(newMessages = aggregatedMessages)
-
+                        
                         // Trigger visual alert preview for fullscreen overlay if anyone sends messages
-                        if (newSync.newMessages.isNotEmpty() && prevSync != null) {
-                            val newest = newSync.newMessages.last()
-                            if (newest.id > prevSync.newMessages.maxOfOrNull { it.id } ?: 0 && newest.userId != uid && !newest.isSystem) {
-                                // Dynamic notification callback on MainActivity helper
+                        if (newSync.newMessages.isNotEmpty() && prevSync != null && lastMsgId > 0) {
+                            val fresh = newSync.newMessages.filter { it.id > lastMsgId && it.userId != uid && !it.isSystem }
+                            if (fresh.isNotEmpty()) {
+                                val newest = fresh.last()
                                 withContext(Dispatchers.Main) {
                                     MainActivity.showFullscreenChatOverview(newest.senderName, newest.message)
                                 }
                             }
                         }
 
+                        // Adjust last known message ID
+                        if (newSync.newMessages.isNotEmpty()) {
+                            lastMsgId = newSync.newMessages.maxOf { it.id }
+                        }
+
+                        _roomSyncState.value = newSync
                     } else if (resp.kicked == true) {
                         // Handle Kick
                         withContext(Dispatchers.Main) {
@@ -432,14 +421,57 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun sendRoomMessage(roomId: Int, msg: String) {
+    fun sendRoomMessage(
+        roomId: Int,
+        msg: String,
+        replyToId: Int? = null,
+        replyToName: String? = null,
+        replyToMsg: String? = null
+    ) {
         val uid = _userId.value ?: return
         viewModelScope.launch {
             try {
                 val service = RaveApiFactory.getService(context)
-                val resp = service.sendRoomChat(body = mapOf("userId" to uid, "roomId" to roomId, "message" to msg))
+                val payload = mutableMapOf<String, Any>(
+                    "userId" to uid,
+                    "roomId" to roomId,
+                    "message" to msg
+                )
+                if (replyToId != null) {
+                    payload["replyToId"] = replyToId
+                }
+                if (replyToName != null) {
+                    payload["replyToName"] = replyToName
+                }
+                if (replyToMsg != null) {
+                    payload["replyToMsg"] = replyToMsg
+                }
+                val resp = service.sendRoomChat(body = payload)
                 if (!resp.success) {
                     showToast(resp.error ?: "Mesaj gönderilemedi.")
+                }
+            } catch (e: Exception) {
+                showToast("Bağlantı hatası.")
+            }
+        }
+    }
+
+    fun deleteRoomMessage(roomId: Int, messageId: Int) {
+        val uid = _userId.value ?: return
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                val resp = service.deleteRoomMessage(
+                    body = mapOf(
+                        "userId" to uid,
+                        "roomId" to roomId,
+                        "messageId" to messageId
+                    )
+                )
+                if (resp.success) {
+                    showToast("Mesaj silindi.")
+                } else {
+                    showToast(resp.error ?: "Mesaj silinemedi.")
                 }
             } catch (e: Exception) {
                 showToast("Bağlantı hatası.")

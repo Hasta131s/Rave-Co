@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import android.content.Context
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -747,6 +748,10 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     var chatMessage by remember { mutableStateOf("") }
     var isSettingsOpen by remember { mutableStateOf(false) }
     var isFullscreen by remember { mutableStateOf(false) }
+    val currentUserId by viewModel.userId.collectAsState()
+    var activeMenuMessage by remember { mutableStateOf<com.example.data.model.RoomMessage?>(null) }
+    var replyingToMessage by remember { mutableStateOf<com.example.data.model.RoomMessage?>(null) }
+    val context = LocalContext.current
 
     val coroutineScope = rememberCoroutineScope()
     val chatListState = rememberLazyListState()
@@ -905,7 +910,14 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                         Row(
                                             verticalAlignment = Alignment.Top,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            modifier = Modifier.padding(horizontal = 4.dp)
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    if (m.isDeleted != true) {
+                                                        activeMenuMessage = m
+                                                    }
+                                                }
+                                                .padding(horizontal = 4.dp, vertical = 4.dp)
                                         ) {
                                             AvatarBadge(avatarKey = m.senderAvatar, size = 32)
                                             Column {
@@ -917,6 +929,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                         fontSize = 12.sp
                                                     )
                                                 }
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 Box(
                                                     modifier = Modifier
                                                         .background(
@@ -930,11 +943,44 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                         )
                                                         .padding(horizontal = 10.dp, vertical = 6.dp)
                                                 ) {
-                                                    Text(
-                                                        text = m.message,
-                                                        color = Color.White,
-                                                        fontSize = 13.sp
-                                                    )
+                                                    Column {
+                                                        // Reply Context Box
+                                                        if (m.replyToId != null) {
+                                                            val rName = m.replyToName ?: "Bilinmeyen"
+                                                            val rMsg = m.replyToMsg ?: ""
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .padding(bottom = 6.dp)
+                                                                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                                                                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), RoundedCornerShape(4.dp))
+                                                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Column {
+                                                                    Text(
+                                                                        text = "↩ $rName",
+                                                                        color = Color.LightGray,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        fontSize = 10.sp
+                                                                    )
+                                                                    Text(
+                                                                        text = rMsg,
+                                                                        color = Color.Gray,
+                                                                        fontSize = 10.sp,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                        
+                                                        Text(
+                                                            text = m.message,
+                                                            color = if (m.isDeleted == true) Color.Gray else Color.White,
+                                                            fontSize = 13.sp,
+                                                            fontStyle = if (m.isDeleted == true) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -952,6 +998,45 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                         currentTab = 1
                                     }
                                 )
+                            }
+
+                            // Reply Target Preview Panel
+                            if (replyingToMessage != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF141414))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "${replyingToMessage!!.senderName} kullanıcısına yanıt veriyorsun",
+                                            color = Color.LightGray,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = replyingToMessage!!.message,
+                                            color = Color.Gray,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { replyingToMessage = null },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Yanıtı Temizle",
+                                            tint = Color.LightGray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
                             }
 
                             // Message Composer (High Density style from design)
@@ -992,7 +1077,18 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                     keyboardActions = KeyboardActions(onSend = {
                                         if (chatMessage.isNotEmpty()) {
-                                            viewModel.sendRoomMessage(roomId, chatMessage)
+                                            if (replyingToMessage != null) {
+                                                viewModel.sendRoomMessage(
+                                                    roomId = roomId,
+                                                    msg = chatMessage,
+                                                    replyToId = replyingToMessage!!.id,
+                                                    replyToName = replyingToMessage!!.senderName,
+                                                    replyToMsg = replyingToMessage!!.message
+                                                )
+                                                replyingToMessage = null
+                                            } else {
+                                                viewModel.sendRoomMessage(roomId, chatMessage)
+                                            }
                                             chatMessage = ""
                                         }
                                     }),
@@ -1022,7 +1118,18 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable(enabled = !sync.myMuteStatus && chatMessage.isNotEmpty()) {
-                                            viewModel.sendRoomMessage(roomId, chatMessage)
+                                            if (replyingToMessage != null) {
+                                                viewModel.sendRoomMessage(
+                                                    roomId = roomId,
+                                                    msg = chatMessage,
+                                                    replyToId = replyingToMessage!!.id,
+                                                    replyToName = replyingToMessage!!.senderName,
+                                                    replyToMsg = replyingToMessage!!.message
+                                                )
+                                                replyingToMessage = null
+                                            } else {
+                                                viewModel.sendRoomMessage(roomId, chatMessage)
+                                            }
                                             chatMessage = ""
                                         },
                                     contentAlignment = Alignment.Center
@@ -1034,6 +1141,88 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
+                            }
+
+                            // Centered Interactive Options Dialog Menu
+                            if (activeMenuMessage != null) {
+                                val msg = activeMenuMessage!!
+                                AlertDialog(
+                                    onDismissRequest = { activeMenuMessage = null },
+                                    title = {
+                                        Text(
+                                            text = "${msg.senderName} • Mesaj Seçenekleri",
+                                            color = Color.White,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
+                                    text = {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = "\"${msg.message}\"",
+                                                color = Color.Gray,
+                                                fontSize = 13.sp,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            
+                                            // Reply Button
+                                            Button(
+                                                onClick = {
+                                                    replyingToMessage = msg
+                                                    activeMenuMessage = null
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2C)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text("Yanıtla", color = Color.White)
+                                            }
+                                            
+                                            // Copy Button
+                                            Button(
+                                                onClick = {
+                                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                    val clip = android.content.ClipData.newPlainText("rave_msg", msg.message)
+                                                    clipboard.setPrimaryClip(clip)
+                                                    viewModel.showToast("Mesaj kopyalandı!")
+                                                    activeMenuMessage = null
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2C)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text("Metni Kopyala", color = Color.White)
+                                            }
+                                            
+                                            // Delete Button (if owned by me OR I am creator/moderator)
+                                            if (msg.userId == currentUserId || isOwnerOrMod) {
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.deleteRoomMessage(roomId, msg.id)
+                                                        activeMenuMessage = null
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text("Mesajı Sil", color = Color.White, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {},
+                                    dismissButton = {
+                                        TextButton(onClick = { activeMenuMessage = null }) {
+                                            Text("Kapat", color = Color.White)
+                                        }
+                                    },
+                                    containerColor = Color(0xFF141414)
+                                )
                             }
                         }
                     } else {

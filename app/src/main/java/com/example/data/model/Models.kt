@@ -71,7 +71,11 @@ data class RoomMessage(
     val senderAvatar: String,
     val message: String,
     val isSystem: Boolean,
-    val timestamp: Long
+    val timestamp: Long,
+    val isDeleted: Boolean? = null,
+    val replyToId: Int? = null,
+    val replyToName: String? = null,
+    val replyToMsg: String? = null
 )
 
 @JsonClass(generateAdapter = true)
