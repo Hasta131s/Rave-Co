@@ -279,6 +279,18 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
                 if (resp.success && resp.roomId != null) {
+                    try {
+                        service.sendRoomChat(
+                            body = mapOf(
+                                "userId" to uid,
+                                "roomId" to resp.roomId,
+                                "message" to "system_join:${_username.value}",
+                                "isSystem" to true
+                            )
+                        )
+                    } catch (ex: Exception) {
+                        Log.e("RaveCo", "Failed to send system_join message on create", ex)
+                    }
                     navigateTo(Screen.RoomView(resp.roomId))
                     showToast("Oda başarıyla kuruldu!")
                 } else {
@@ -297,6 +309,18 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                 val service = RaveApiFactory.getService(context)
                 val resp = service.joinRoom(body = mapOf("userId" to uid, "roomId" to roomId))
                 if (resp.success) {
+                    try {
+                        service.sendRoomChat(
+                            body = mapOf(
+                                "userId" to uid,
+                                "roomId" to roomId,
+                                "message" to "system_join:${_username.value}",
+                                "isSystem" to true
+                            )
+                        )
+                    } catch (ex: Exception) {
+                        Log.e("RaveCo", "Failed to send system_join message", ex)
+                    }
                     navigateTo(Screen.RoomView(roomId))
                 } else {
                     showToast(resp.error ?: "Odaya katılım başarısız oldu.")
@@ -312,6 +336,18 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val service = RaveApiFactory.getService(context)
+                try {
+                    service.sendRoomChat(
+                        body = mapOf(
+                            "userId" to uid,
+                            "roomId" to roomId,
+                            "message" to "system_left:${_username.value}",
+                            "isSystem" to true
+                        )
+                    )
+                } catch (ex: Exception) {
+                    Log.e("RaveCo", "Failed to send system_left message", ex)
+                }
                 service.leaveRoom(body = mapOf("userId" to uid, "roomId" to roomId))
                 _roomSyncState.value = null
                 navigateTo(Screen.RoomsList)

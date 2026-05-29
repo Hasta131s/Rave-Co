@@ -18,6 +18,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -251,6 +254,12 @@ val AVATARS = listOf(
     "avatar8" to Triple("🌙", "Luna Star", Color(0xFFD9D9D9))
 )
 
+fun findImageUrl(text: String): String? {
+    val pattern = """(https?://[^\s]+?\.(?:jpg|jpeg|png|webp|gif|bmp))(?:\?[^\s]*)?""".toRegex(RegexOption.IGNORE_CASE)
+    val match = pattern.find(text)
+    return match?.value
+}
+
 fun getAvatarEmoji(key: String): String {
     return AVATARS.firstOrNull { it.first == key }?.second?.first ?: "🐼"
 }
@@ -266,13 +275,12 @@ fun AvatarBadge(
     size: Int = 40,
     selected: Boolean = false
 ) {
-    val emoji = getAvatarEmoji(avatarKey)
-    val color = getAvatarColor(avatarKey)
+    val isUrl = avatarKey.startsWith("http://") || avatarKey.startsWith("https://")
     Box(
         modifier = modifier
             .size(size.dp)
             .clip(CircleShape)
-            .background(color)
+            .then(if (isUrl) Modifier else Modifier.background(getAvatarColor(avatarKey)))
             .border(
                 width = if (selected) 2.dp else 1.dp,
                 color = if (selected) Color.White else Color.Black.copy(alpha = 0.2f),
@@ -280,7 +288,17 @@ fun AvatarBadge(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = emoji, fontSize = (size * 0.55f).sp)
+        if (isUrl) {
+            AsyncImage(
+                model = avatarKey,
+                contentDescription = "Avatar",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            val emoji = getAvatarEmoji(avatarKey)
+            Text(text = emoji, fontSize = (size * 0.55f).sp)
+        }
     }
 }
 
@@ -744,10 +762,10 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
 @Composable
 fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     val syncState by viewModel.roomSyncState.collectAsState()
-    var currentTab by remember { mutableStateOf(0) } // 0 = Chat, 1 = Participants
-    var chatMessage by remember { mutableStateOf("") }
-    var isSettingsOpen by remember { mutableStateOf(false) }
-    var isFullscreen by remember { mutableStateOf(false) }
+    var currentTab by rememberSaveable { mutableStateOf(0) } // 0 = Chat, 1 = Participants
+    var chatMessage by rememberSaveable { mutableStateOf("") }
+    var isSettingsOpen by rememberSaveable { mutableStateOf(false) }
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
     val currentUserId by viewModel.userId.collectAsState()
     var activeMenuMessage by remember { mutableStateOf<com.example.data.model.RoomMessage?>(null) }
     var expandedMessageId by remember { mutableStateOf<Int?>(null) }
@@ -1017,12 +1035,27 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                             }
                                                         }
                                                         
-                                                        Text(
-                                                            text = m.message,
-                                                            color = if (m.isDeleted == true) Color.Gray else Color.White,
-                                                            fontSize = 13.sp,
-                                                            fontStyle = if (m.isDeleted == true) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
-                                                        )
+                                                        Column {
+                                                            val imageUrl = findImageUrl(m.message)
+                                                            if (imageUrl != null) {
+                                                                AsyncImage(
+                                                                    model = imageUrl,
+                                                                    contentDescription = "Görsel",
+                                                                    modifier = Modifier
+                                                                        .padding(bottom = 6.dp)
+                                                                        .fillMaxWidth()
+                                                                        .heightIn(max = 180.dp)
+                                                                        .clip(RoundedCornerShape(8.dp)),
+                                                                    contentScale = ContentScale.Fit
+                                                                )
+                                                            }
+                                                            Text(
+                                                                text = m.message,
+                                                                color = if (m.isDeleted == true) Color.Gray else Color.White,
+                                                                fontSize = 13.sp,
+                                                                fontStyle = if (m.isDeleted == true) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
+                                                            )
+                                                        }
                                                     }
                                                 }
 
@@ -1907,12 +1940,40 @@ fun DmChatScreen(
                             ),
                             modifier = Modifier.widthIn(max = 280.dp)
                         ) {
-                            Text(
-                                text = m.message,
-                                color = if (isMe) Color.Black else Color.White,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                val imageUrl = findImageUrl(m.message)
+                                if (imageUrl != null) {
+                                    AsyncImage(
+                                        model = imageUrl,
+                                        contentDescription = "Görsel",
+                                        modifier = Modifier
+                                            .padding(bottom = 6.dp)
+                                            .fillMaxWidth()
+                                            .heightIn(max = 180.dp)
+                                            .clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                                Text(
+                                    text = m.message,
+                                    color = if (isMe) Color.Black else Color.White,
+                                    fontSize = 14.sp
+                                )
+                                if (isMe) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(
+                                        modifier = Modifier.align(Alignment.End),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (m.isRead) "✓✓" else "✓",
+                                            color = if (m.isRead) Color(0xFF2196F3) else Color.Gray,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -2085,6 +2146,24 @@ fun ProfileScreen(viewModel: RaveViewModel) {
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Veya Özel Profil Resim URL'si Girin:", color = Color.LightGray, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = if (currentAvatar.startsWith("http://") || currentAvatar.startsWith("https://")) currentAvatar else "",
+                    onValueChange = { 
+                        currentAvatar = it
+                    },
+                    placeholder = { Text("https://example.com/resim.jpg", color = Color.Gray, fontSize = 12.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = Color.DarkGray,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             item {
