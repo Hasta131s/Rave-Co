@@ -46,6 +46,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Hide status bars / battery indicator for fully immersive viewing experience
+        try {
+            val windowInsetsController = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+            windowInsetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            windowInsetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } catch (e: Exception) {
+            android.util.Log.e("RaveCo", "Failed to hide status bars", e)
+        }
+
         // Create DM Notification Channel
         createNotificationChannel(this)
 
@@ -62,7 +71,8 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MyApplicationTheme {
+            val selectedTheme by viewModel.appTheme.collectAsState()
+            MyApplicationTheme(theme = selectedTheme) {
                 val currentScreen by viewModel.currentScreen.collectAsState()
                 val activeRoomMsg by fullscreenChatSender.collectAsState()
 

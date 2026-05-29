@@ -146,6 +146,18 @@ interface RaveApiService {
         @Query("action") action: String = "poll_notifications",
         @Body body: Map<String, Int>
     ): PollNotificationsResponse
+
+    @POST("api.php")
+    suspend fun getSharedContents(
+        @Query("action") action: String = "get_shared_contents",
+        @Body body: Map<String, Int> = emptyMap()
+    ): SharedContentsResponse
+
+    @POST("api.php")
+    suspend fun addSharedContent(
+        @Query("action") action: String = "add_shared_content",
+        @Body body: Map<String, String>
+    ): BaseResponse
 }
 
 object RaveApiFactory {

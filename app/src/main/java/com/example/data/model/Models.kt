@@ -182,3 +182,19 @@ data class PollNotificationsResponse(
     val error: String? = null,
     val newDMs: List<DMNotification>? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class SharedContent(
+    val id: Int,
+    val title: String,
+    val url: String,
+    val addedBy: String,
+    val category: String
+)
+
+@JsonClass(generateAdapter = true)
+data class SharedContentsResponse(
+    val success: Boolean,
+    val error: String? = null,
+    val contents: List<SharedContent>? = null
+)

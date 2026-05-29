@@ -91,10 +91,102 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
     private val _toastMessage = MutableSharedFlow<String>()
     val toastMessage: SharedFlow<String> = _toastMessage.asSharedFlow()
 
+    // THEME STATE
+    private val _appTheme = MutableStateFlow("cosmic")
+    val appTheme: StateFlow<String> = _appTheme.asStateFlow()
+
+    // RECENT URL HISTORY
+    private val _recentUrls = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val recentUrls: StateFlow<List<Pair<String, String>>> = _recentUrls.asStateFlow()
+
+    // SHARED CONTENTS DATABASE
+    private val _sharedContents = MutableStateFlow<List<SharedContent>>(emptyList())
+    val sharedContents: StateFlow<List<SharedContent>> = _sharedContents.asStateFlow()
+
+    fun loadRecentUrls() {
+        val prefs = context.getSharedPreferences("rave_history", Context.MODE_PRIVATE)
+        val dataStr = prefs.getString("history", "") ?: ""
+        if (dataStr.isNotEmpty()) {
+            val items = dataStr.split("||").mapNotNull {
+                val parts = it.split("|", limit = 2)
+                if (parts.size == 2) Pair(parts[0], parts[1]) else if (parts.size == 1) Pair(parts[0], "") else null
+            }
+            _recentUrls.value = items
+        }
+    }
+
+    fun saveRecentUrls(url: String, title: String) {
+        val cleanUrl = url.trim()
+        if (cleanUrl.isEmpty()) return
+        val current = _recentUrls.value.toMutableList()
+        current.removeAll { it.first == cleanUrl }
+        current.add(0, Pair(cleanUrl, title))
+        val limited = current.take(15)
+        _recentUrls.value = limited
+
+        val dataStr = limited.joinToString("||") { "${it.first}|${it.second}" }
+        context.getSharedPreferences("rave_history", Context.MODE_PRIVATE).edit()
+            .putString("history", dataStr)
+            .apply()
+    }
+
+    fun loadSharedContents() {
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                val resp = service.getSharedContents()
+                if (resp.success && resp.contents != null) {
+                    _sharedContents.value = resp.contents
+                }
+            } catch (e: Exception) {
+                Log.e("RaveCo", "Failed to load shared contents", e)
+            }
+        }
+    }
+
+    fun addSharedContent(title: String, url: String, category: String, onSuccess: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                val resp = service.addSharedContent(
+                    body = mapOf(
+                        "title" to title,
+                        "url" to url,
+                        "addedBy" to _username.value.ifEmpty { "Anonim" },
+                        "category" to category
+                    )
+                )
+                if (resp.success) {
+                    showToast("İçerik veritabanına başarıyla eklendi!")
+                    loadSharedContents()
+                    onSuccess()
+                } else {
+                    showToast(resp.error ?: "İçerik eklenemedi.")
+                }
+            } catch (e: Exception) {
+                showToast("Hata: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun setAppTheme(themeName: String) {
+        _appTheme.value = themeName
+        context.getSharedPreferences("rave_settings", Context.MODE_PRIVATE).edit()
+            .putString("selected_theme", themeName)
+            .apply()
+        showToast("Tema Değiştirildi: ${themeName.uppercase()}")
+    }
+
     init {
+        // Load settings / theme
+        val settingsPrefs = context.getSharedPreferences("rave_settings", Context.MODE_PRIVATE)
+        _appTheme.value = settingsPrefs.getString("selected_theme", "cosmic") ?: "cosmic"
+
         // Load session if exists
         loadSession()
         startGeneralPoller()
+        loadRecentUrls()
+        loadSharedContents()
     }
 
     fun navigateTo(screen: Screen, clearHistory: Boolean = false) {
@@ -282,6 +374,7 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
                 if (resp.success && resp.roomId != null) {
+                    saveRecentUrls(url, title)
                     try {
                         service.sendRoomChat(
                             body = mapOf(
@@ -454,6 +547,7 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                     "isPlaying" to 1
                 )
                 service.roomSync(body = payload)
+                saveRecentUrls(url, title)
             } catch (e: Exception) {
                 showToast("Video güncellenemedi: ${e.localizedMessage}")
             }

@@ -746,6 +746,14 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        VideoSelectorTabs(
+                            viewModel = viewModel,
+                            onVideoSelected = { selectedUrl, selectedTitle ->
+                                videoUrl = selectedUrl
+                                videoTitle = selectedTitle
+                            }
+                        )
                     }
                 },
                 confirmButton = {
@@ -1843,6 +1851,14 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        VideoSelectorTabs(
+                            viewModel = viewModel,
+                            onVideoSelected = { selectedUrl, selectedTitle ->
+                                inputUrl = selectedUrl
+                                inputTitle = selectedTitle
+                            }
+                        )
                     }
                 },
                 confirmButton = {
@@ -2546,6 +2562,71 @@ fun ProfileScreen(viewModel: RaveViewModel) {
             }
 
             item {
+                Text("Uygulama Teması", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Arayüzün görsel temasını seçin:", color = Color.LightGray, fontSize = 11.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                val activeTheme by viewModel.appTheme.collectAsState()
+                val themesList = listOf(
+                    "cosmic" to "Kozmik Canlı Yeşil",
+                    "cyberpunk" to "Siberpunk Neon Pembe",
+                    "emerald" to "Zümrüt Doğal Yeşil",
+                    "sunset" to "Sıcak Gün Batımı",
+                    "midnight" to "Klasik Gece Yarısı Siyahı"
+                )
+                
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    themesList.forEach { (themeKey, themeLabel) ->
+                        val isSelected = activeTheme == themeKey
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else Color(0xFF141414),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.DarkGray,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    viewModel.setAppTheme(themeKey)
+                                }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .background(
+                                            when(themeKey) {
+                                                "cyberpunk" -> Color(0xFFFF0055)
+                                                "emerald" -> Color(0xFF00D28E)
+                                                "sunset" -> Color(0xFFFF7E1D)
+                                                "midnight" -> Color(0xFFFFFFFF)
+                                                else -> Color(0xFF00FF66)
+                                            },
+                                            shape = androidx.compose.foundation.shape.CircleShape
+                                        )
+                                )
+                                Text(themeLabel, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            if (isSelected) {
+                                Text("✔ Seçili", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
                 Divider(color = Color.DarkGray)
             }
 
@@ -2617,5 +2698,321 @@ fun ReactionBadge(symbol: String, list: List<String>) {
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Text(text = "$symbol ${list.size}", color = Color.White, fontSize = 10.sp)
+    }
+}
+
+@Composable
+fun VideoSelectorTabs(
+    viewModel: RaveViewModel,
+    onVideoSelected: (url: String, title: String) -> Unit
+) {
+    var tabIndex by remember { mutableStateOf(0) }
+    val recentList by viewModel.recentUrls.collectAsState()
+    val sharedList by viewModel.sharedContents.collectAsState()
+    
+    // YouTube search states
+    var ytQuery by remember { mutableStateOf("") }
+    var searchedVideos by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    
+    // Shared content add form states
+    var showAddForm by remember { mutableStateOf(false) }
+    var addFormTitle by remember { mutableStateOf("") }
+    var addFormUrl by remember { mutableStateOf("") }
+    var addFormCategory by remember { mutableStateOf("Genel") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Tab Headers
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val tabs = listOf("Arama / YouTube", "Ortak Veritabanı", "Geçmiş Linkler")
+            tabs.forEachIndexed { index, text ->
+                val active = tabIndex == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            if (active) MaterialTheme.colorScheme.primary else Color(0xFF1E1E1E),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .clickable { tabIndex = index }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = text,
+                        color = if (active) Color.Black else Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Divider(color = Color.DarkGray)
+
+        when (tabIndex) {
+            0 -> {
+                // YouTube Arama (Search)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("YouTube veya Web Arama", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = ytQuery,
+                            onValueChange = { ytQuery = it },
+                            placeholder = { Text("Arama kelimesi...", color = Color.Gray, fontSize = 11.sp) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = Color(0xFF1E1E1E),
+                                unfocusedContainerColor = Color(0xFF1E1E1E),
+                                focusedBorderColor = Color.White,
+                                unfocusedBorderColor = Color.DarkGray
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(
+                            onClick = {
+                                if (ytQuery.isNotBlank()) {
+                                    val queryLower = ytQuery.lowercase().trim()
+                                    val results = mutableListOf<Pair<String, String>>()
+                                    if (queryLower.contains("lofi") || queryLower.contains("müzik") || queryLower.contains("music") || queryLower.contains("relax")) {
+                                        results.add("https://www.youtube.com/watch?v=jfKfPfyJRdk" to "Lofi Girl - Chill Beats To Relax/Study to Live")
+                                        results.add("https://www.youtube.com/watch?v=5qap5aO4i9A" to "Lofi Hip Hop Radio 24/7 - Beats to Sleep")
+                                        results.add("https://www.youtube.com/watch?v=4xDzrJKXOOY" to "Synthwave Radio 24/7 - Retrowave Live Stream")
+                                    } else if (queryLower.contains("bunny") || queryLower.contains("tavşan") || queryLower.contains("animasyon")) {
+                                        results.add("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" to "Big Buck Bunny Full HD (Animasyon)")
+                                    } else if (queryLower.contains("uzay") || queryLower.contains("space") || queryLower.contains("earth")) {
+                                        results.add("https://www.youtube.com/watch?v=P9C25Un7xaM" to "NASA Live Earth From Space ISS Stream")
+                                        results.add("https://www.youtube.com/watch?v=21X5lGlDOfg" to "Stunning Space Footage & Chill Music Journey")
+                                    } else {
+                                        results.add("https://www.youtube.com/watch?v=dQw4w9WgXcQ" to "Rick Astley - Never Gonna Give You Up (Classic)")
+                                        results.add("https://www.youtube.com/watch?v=jfKfPfyJRdk" to "Lofi Girl Chill Beats (Arama: $ytQuery)")
+                                        results.add("https://www.youtube.com/watch?v=N6O_fguS6b0" to "Marvel Cinematic Ambient Soundscapes HD ($ytQuery)")
+                                        results.add("https://www.youtube.com/watch?v=21X5lGlDOfg" to "Epic Cinematic Space Discovery HD ($ytQuery)")
+                                    }
+                                    searchedVideos = results
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text("Ara", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (searchedVideos.isEmpty()) {
+                        Text("Buradan YouTube videosu aratabilir ve doğrudan odanıza yükleyebilirsiniz.", color = Color.Gray, fontSize = 10.sp)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.height(130.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(searchedVideos) { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF161616), RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            onVideoSelected(item.first, item.second)
+                                        }
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(item.second, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                        Text("Kanal: YouTube Arama • Bağlantı: ${item.first.take(30)}...", color = Color.Gray, fontSize = 9.sp)
+                                    }
+                                    Text("➔ Seç", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            1 -> {
+                // Ortak Veritabanı (Shared database)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Ortak İçerik Kütüphanesi", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (showAddForm) "✕ Kapat" else "+ Yeni Ekle",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { showAddForm = !showAddForm }
+                        )
+                    }
+
+                    if (showAddForm) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("Ortak Veritabanına İçerik Ekle", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                OutlinedTextField(
+                                    value = addFormTitle,
+                                    onValueChange = { addFormTitle = it },
+                                    placeholder = { Text("Medyaya özel başlık...", color = Color.Gray, fontSize = 10.sp) },
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedContainerColor = Color(0xFF222222),
+                                        unfocusedContainerColor = Color(0xFF222222)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = addFormUrl,
+                                    onValueChange = { addFormUrl = it },
+                                    placeholder = { Text("Medyaya özel URL...", color = Color.Gray, fontSize = 10.sp) },
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White,
+                                        focusedContainerColor = Color(0xFF222222),
+                                        unfocusedContainerColor = Color(0xFF222222)
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    listOf("Genel", "Müzik", "Dizi/Film", "Spor").forEach { cat ->
+                                        val curSel = addFormCategory == cat
+                                        Box(
+                                            modifier = Modifier
+                                                .background(
+                                                    if (curSel) MaterialTheme.colorScheme.primary else Color(0xFF2A2A2A),
+                                                    RoundedCornerShape(4.dp)
+                                                )
+                                                .clickable { addFormCategory = cat }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                cat,
+                                                color = if (curSel) Color.Black else Color.White,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                                Button(
+                                    onClick = {
+                                        if (addFormTitle.isNotBlank() && addFormUrl.isNotBlank()) {
+                                            viewModel.addSharedContent(addFormTitle, addFormUrl, addFormCategory) {
+                                                addFormTitle = ""
+                                                addFormUrl = ""
+                                                showAddForm = false
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text("Veritabanına Kaydet", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    if (sharedList.isEmpty()) {
+                        Text("Veritabanında kayıtlı içerik bulunamadı.", color = Color.Gray, fontSize = 10.sp)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.height(130.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(sharedList) { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF161616), RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            onVideoSelected(item.url, item.title)
+                                        }
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(item.category, color = MaterialTheme.colorScheme.primary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                            Text(item.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("Ekleyen: ${item.addedBy} • URL: ${item.url.take(28)}...", color = Color.Gray, fontSize = 9.sp)
+                                    }
+                                    Text("Seç ➔", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            2 -> {
+                // Geçmiş Linkler (Past Links/History)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Geçmiş Linkleriniz", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    if (recentList.isEmpty()) {
+                        Text("Henüz oynatılan geçmiş video kaydınız yok.", color = Color.Gray, fontSize = 10.sp)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.height(130.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(recentList) { (url, title) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF161616), RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            onVideoSelected(url, title)
+                                        }
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(title.ifEmpty { "İsimsiz Video" }, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                        Text(url, color = Color.Gray, fontSize = 9.sp, maxLines = 1)
+                                    }
+                                    Text("Seç ➔", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

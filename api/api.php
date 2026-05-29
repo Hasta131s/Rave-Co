@@ -117,6 +117,15 @@ try {
             kicked_at INTEGER DEFAULT 0,
             PRIMARY KEY (room_id, user_id)
         );");
+
+        // 8. Shared User Contents
+        $db->exec("CREATE TABLE IF NOT EXISTS shared_contents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL,
+            added_by TEXT DEFAULT 'Anonim',
+            category TEXT DEFAULT 'Genel'
+        );");
     } else {
         // MySQL equivalents
         $db->exec("CREATE TABLE IF NOT EXISTS users (
@@ -186,7 +195,33 @@ try {
             kicked_at BIGINT DEFAULT 0,
             PRIMARY KEY (room_id, user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        // MySQL shared contents
+        $db->exec("CREATE TABLE IF NOT EXISTS shared_contents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            url TEXT NOT NULL,
+            added_by VARCHAR(100) DEFAULT 'Anonim',
+            category VARCHAR(100) DEFAULT 'Genel'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     }
+
+    // Seed default content if empty
+    try {
+        $cnt_stmt = $db->query("SELECT COUNT(*) FROM shared_contents");
+        $cnt = (int)$cnt_stmt->fetchColumn();
+        if ($cnt == 0) {
+            $seeds = [
+                ['title' => 'Big Buck Bunny (MP4)', 'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'added_by' => 'Sistem', 'category' => 'Animasyon'],
+                ['title' => 'Sintel (MP4)', 'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', 'added_by' => 'Sistem', 'category' => 'Animasyon'],
+                ['title' => 'Tears of Steel (Sci-Fi)', 'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', 'added_by' => 'Sistem', 'category' => 'Bilim Kurgu']
+            ];
+            $ins_seed = $db->prepare("INSERT INTO shared_contents (title, url, added_by, category) VALUES (:t, :u, :a, :c)");
+            foreach ($seeds as $s) {
+                $ins_seed->execute([':t' => $s['title'], ':u' => $s['url'], ':a' => $s['added_by'], ':c' => $s['category']]);
+            }
+        }
+    } catch (Exception $e) {}
 
     // ALTER room_messages to support replies and deletions on both SQLite and MySQL
     try {
@@ -587,8 +622,7 @@ switch ($action) {
         
         if ($owner_id === $userId) {
             // Assign next active moderator or member, or delete room
-            $stmt_next = $db->prepare("SELECT user_id, role FROM room_participants WHERE room_id = :rid ORDER BY role = 'moderator' DESC, joined_at ASC LIMIT 1");
-            // Note: SQLite doesn't have joined_at in schema, but ordering by rowid is implicit creation order or fine
+            $stmt_next = $db->prepare("SELECT user_id, role FROM room_participants WHERE room_id = :rid ORDER BY role = 'moderator' DESC, last_seen DESC LIMIT 1");
             $stmt_next->execute([':rid' => $roomId]);
             $next = $stmt_next->fetch(PDO::FETCH_ASSOC);
             
@@ -1424,6 +1458,42 @@ switch ($action) {
         ]);
         
         respond(true, ['chatLocked' => ($new_locked === 1)]);
+        break;
+
+    case 'get_shared_contents':
+        $stmt_shared = $db->query("SELECT * FROM shared_contents ORDER BY id DESC LIMIT 100");
+        $shared_items = $stmt_shared->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($shared_items as $item) {
+            $out[] = [
+                'id' => (int)$item['id'],
+                'title' => $item['title'],
+                'url' => $item['url'],
+                'addedBy' => $item['added_by'],
+                'category' => $item['category']
+            ];
+        }
+        respond(true, ['contents' => $out]);
+        break;
+
+    case 'add_shared_content':
+        $title = trim($input['title'] ?? '');
+        $url = trim($input['url'] ?? '');
+        $addedBy = trim($input['addedBy'] ?? 'Anonim');
+        $category = trim($input['category'] ?? 'Genel');
+
+        if (empty($title) || empty($url)) {
+            respond(false, [], "Lütfen başlık ve URL girin.");
+        }
+
+        $ins_shared = $db->prepare("INSERT INTO shared_contents (title, url, added_by, category) VALUES (:t, :u, :a, :c)");
+        $ins_shared->execute([
+            ':t' => $title,
+            ':u' => $url,
+            ':a' => $addedBy,
+            ':c' => $category
+        ]);
+        respond(true, ['id' => (int)$db->lastInsertId()]);
         break;
 
     default:
