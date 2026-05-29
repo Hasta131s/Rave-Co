@@ -30,6 +30,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.viewmodel.RaveViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -292,21 +294,41 @@ fun ExoPlayerCompose(
     val isOwner = syncState?.myRole == "owner" || syncState?.myRole == "moderator"
 
     val exoPlayer = remember(videoUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
-            repeatMode = Player.REPEAT_MODE_OFF
-            val isHls = videoUrl.contains(".m3u8") || videoUrl.contains("hls")
-            val mediaItem = if (isHls) {
-                MediaItem.Builder()
-                    .setUri(Uri.parse(videoUrl))
-                    .setMimeType("application/x-mpegURL")
-                    .build()
-            } else {
-                MediaItem.fromUri(Uri.parse(videoUrl))
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(15000)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
+
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build().apply {
+                playWhenReady = true
+                repeatMode = Player.REPEAT_MODE_OFF
+                val cleanedUrl = videoUrl.trim()
+                val lowercaseUrl = cleanedUrl.lowercase()
+                val isHls = lowercaseUrl.contains("m3u8") || lowercaseUrl.contains("hls") || lowercaseUrl.contains(".m3u") || lowercaseUrl.contains("/chunk") || lowercaseUrl.contains("stream-resolution")
+                val isDash = lowercaseUrl.contains(".mpd") || lowercaseUrl.contains("dash")
+                
+                val mediaItem = if (isHls) {
+                    MediaItem.Builder()
+                        .setUri(Uri.parse(cleanedUrl))
+                        .setMimeType("application/x-mpegURL")
+                        .build()
+                } else if (isDash) {
+                    MediaItem.Builder()
+                        .setUri(Uri.parse(cleanedUrl))
+                        .setMimeType("application/dash+xml")
+                        .build()
+                } else {
+                    MediaItem.fromUri(Uri.parse(cleanedUrl))
+                }
+                setMediaItem(mediaItem)
+                prepare()
             }
-            setMediaItem(mediaItem)
-            prepare()
-        }
     }
 
     // Monitor Player changes to push up to viewmodel state if Owner
