@@ -95,6 +95,10 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
     private val _appTheme = MutableStateFlow("cosmic")
     val appTheme: StateFlow<String> = _appTheme.asStateFlow()
 
+    // SYSTEM LOADING
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     // RECENT URL HISTORY
     private val _recentUrls = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val recentUrls: StateFlow<List<Pair<String, String>>> = _recentUrls.asStateFlow()
@@ -365,6 +369,7 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
     fun loadRooms() {
         val uid = _userId.value ?: return
         viewModelScope.launch {
+            _isLoading.value = true
             try {
                 val service = RaveApiFactory.getService(context)
                 val resp = service.getRooms(body = mapOf("userId" to uid))
@@ -373,6 +378,8 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 Log.e("RaveCo", "Failed to load rooms", e)
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -380,6 +387,7 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
     fun createRoom(roomName: String, url: String, title: String) {
         val uid = _userId.value ?: return
         viewModelScope.launch {
+            _isLoading.value = true
             try {
                 val service = RaveApiFactory.getService(context)
                 val resp = service.createRoom(
@@ -392,18 +400,6 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 if (resp.success && resp.roomId != null) {
                     saveRecentUrls(url, title)
-                    try {
-                        service.sendRoomChat(
-                            body = mapOf(
-                                "userId" to uid,
-                                "roomId" to resp.roomId,
-                                "message" to "system_join:${_username.value}",
-                                "isSystem" to true
-                            )
-                        )
-                    } catch (ex: Exception) {
-                        Log.e("RaveCo", "Failed to send system_join message on create", ex)
-                    }
                     navigateTo(Screen.RoomView(resp.roomId))
                     showToast("Oda başarıyla kuruldu!")
                 } else {
@@ -411,6 +407,8 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 showToast("Hata: ${e.localizedMessage}")
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -418,28 +416,19 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
     fun joinRoom(roomId: Int) {
         val uid = _userId.value ?: return
         viewModelScope.launch {
+            _isLoading.value = true
             try {
                 val service = RaveApiFactory.getService(context)
                 val resp = service.joinRoom(body = mapOf("userId" to uid, "roomId" to roomId))
                 if (resp.success) {
-                    try {
-                        service.sendRoomChat(
-                            body = mapOf(
-                                "userId" to uid,
-                                "roomId" to roomId,
-                                "message" to "system_join:${_username.value}",
-                                "isSystem" to true
-                            )
-                        )
-                    } catch (ex: Exception) {
-                        Log.e("RaveCo", "Failed to send system_join message", ex)
-                    }
                     navigateTo(Screen.RoomView(roomId))
                 } else {
                     showToast(resp.error ?: "Odaya katılım başarısız oldu.")
                 }
             } catch (e: Exception) {
                 showToast("Hata: ${e.localizedMessage}")
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -447,26 +436,17 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
     fun leaveRoom(roomId: Int) {
         val uid = _userId.value ?: return
         viewModelScope.launch {
+            _isLoading.value = true
             try {
                 val service = RaveApiFactory.getService(context)
-                try {
-                    service.sendRoomChat(
-                        body = mapOf(
-                            "userId" to uid,
-                            "roomId" to roomId,
-                            "message" to "system_left:${_username.value}",
-                            "isSystem" to true
-                        )
-                    )
-                } catch (ex: Exception) {
-                    Log.e("RaveCo", "Failed to send system_left message", ex)
-                }
                 service.leaveRoom(body = mapOf("userId" to uid, "roomId" to roomId))
                 _roomSyncState.value = null
                 navigateTo(Screen.RoomsList)
             } catch (e: Exception) {
                 Log.e("RaveCo", "Failed to leave room", e)
                 navigateTo(Screen.RoomsList)
+            } finally {
+                _isLoading.value = false
             }
         }
     }
@@ -524,7 +504,24 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                             lastMsgId = newSync.newMessages.maxOf { it.id }
                         }
 
-                        _roomSyncState.value = newSync
+                        val shouldUpdate = prevSync == null ||
+                            prevSync.roomId != newSync.roomId ||
+                            prevSync.videoUrl != newSync.videoUrl ||
+                            prevSync.videoTitle != newSync.videoTitle ||
+                            prevSync.isPlaying != newSync.isPlaying ||
+                            prevSync.ownerId != newSync.ownerId ||
+                            prevSync.myRole != newSync.myRole ||
+                            prevSync.myMuteStatus != newSync.myMuteStatus ||
+                            Math.abs(prevSync.playbackTime - newSync.playbackTime) > 1.5f ||
+                            prevSync.newMessages != newSync.newMessages ||
+                            prevSync.participants != newSync.participants ||
+                            prevSync.typingUsers != newSync.typingUsers ||
+                            prevSync.kickedUsers != newSync.kickedUsers ||
+                            prevSync.isChatLocked != newSync.isChatLocked
+
+                        if (shouldUpdate) {
+                            _roomSyncState.value = newSync
+                        }
                     } else if (resp.kicked == true) {
                         // Handle Kick
                         withContext(Dispatchers.Main) {
@@ -537,7 +534,7 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (e: Exception) {
                     Log.e("RaveCo", "Room Sync Polling Failed", e)
                 }
-                delay(1500) // Lower lookup latency for smoother watching sync
+                delay(500) // Lower lookup latency for smoother watching sync
             }
         }
     }
@@ -598,10 +595,10 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val resp = service.sendRoomChat(body = payload)
                 if (!resp.success) {
-                    showToast(resp.error ?: "Mesaj gönderilemedi.")
+                    Log.e("RaveCo", "Message send error: ${resp.error}")
                 }
             } catch (e: Exception) {
-                showToast("Bağlantı hatası.")
+                Log.e("RaveCo", "Message network error", e)
             }
         }
     }

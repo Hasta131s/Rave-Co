@@ -22,6 +22,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -75,6 +77,7 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme(theme = selectedTheme) {
                 val currentScreen by viewModel.currentScreen.collectAsState()
                 val activeRoomMsg by fullscreenChatSender.collectAsState()
+                val isLoading by viewModel.isLoading.collectAsState()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -100,6 +103,22 @@ class MainActivity : ComponentActivity() {
                                 scr.partnerAvatar
                             )
                             is Screen.Profile -> ProfileScreen(viewModel)
+                        }
+
+                        // GLOBAL FULLSCREEN LOADER
+                        if (isLoading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.5f))
+                                    .clickable(
+                                        indication = null,
+                                        interactionSource = remember { MutableInteractionSource() }
+                                    ) {},
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            }
                         }
 
                         // Fullscreen transparent floating message preview hud

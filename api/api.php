@@ -31,6 +31,9 @@ try {
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         // Enable Foreign Keys in SQLite
         $db->exec("PRAGMA foreign_keys = ON;");
+        $db->exec("PRAGMA journal_mode = WAL;");
+        $db->exec("PRAGMA synchronous = NORMAL;");
+        $db->exec("PRAGMA busy_timeout = 5000;");
     } else {
         $db = new PDO("mysql:host=" . MYSQL_HOST . ";dbname=" . MYSQL_DB . ";charset=utf8", MYSQL_USER, MYSQL_PASS);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -315,6 +318,11 @@ try {
         $del_rooms_stmt = $db->prepare("DELETE FROM rooms WHERE id IN ($in_clause)");
         $del_rooms_stmt->execute($empty_rooms);
     }
+
+    // Aggressive cleanup: delete messages older than 2 hours to avoid lag
+    $old_time = $currentTime - 7200;
+    $db->prepare("DELETE FROM room_messages WHERE timestamp < :ot")->execute([':ot' => $old_time]);
+
 } catch (Exception $ex) {
     // Suppress clean issues
 }

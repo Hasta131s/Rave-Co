@@ -71,9 +71,8 @@ fun RaveHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF090909))
+            .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding()
-            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)))
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -126,8 +125,7 @@ fun RaveSyncStatusBar() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF020202))
-            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.04f)))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -169,7 +167,7 @@ fun RaveModToolsBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)))
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -648,7 +646,7 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { viewModel.joinRoom(r.id) },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0C0C)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
                         ) {
                             Row(
@@ -862,10 +860,10 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = Color.White)
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
         return
     }
@@ -874,8 +872,9 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     val isOwnerOrMod = sync.myRole == "owner" || sync.myRole == "moderator"
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp)
+    ) { _ ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -929,11 +928,11 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                 // Split Tabs (Chat / Participants)
                 TabRow(
                     selectedTabIndex = currentTab,
-                    containerColor = Color.Black,
-                    contentColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.tabIndicatorOffset(tabPositions[currentTab])
                         )
                     }
@@ -1084,31 +1083,9 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                             Text(
                                                                 text = m.message,
                                                                 color = if (m.isDeleted == true) Color.Gray else Color.White,
-                                                                fontSize = 13.sp,
+                                                                fontSize = 15.sp,
                                                                 fontStyle = if (m.isDeleted == true) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
                                                             )
-                                                            
-                                                            val likes = m.likeReacts ?: emptyList()
-                                                            val dislikes = m.dislikeReacts ?: emptyList()
-                                                            val sads = m.sadReacts ?: emptyList()
-
-                                                            if ((m.isDeleted != true) && (likes.isNotEmpty() || dislikes.isNotEmpty() || sads.isNotEmpty())) {
-                                                                Row(
-                                                                    modifier = Modifier.padding(top = 4.dp),
-                                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                                    verticalAlignment = Alignment.CenterVertically
-                                                                ) {
-                                                                    if (likes.isNotEmpty()) {
-                                                                        ReactionBadge(symbol = "👍", list = likes)
-                                                                    }
-                                                                    if (dislikes.isNotEmpty()) {
-                                                                        ReactionBadge(symbol = "👎", list = dislikes)
-                                                                    }
-                                                                    if (sads.isNotEmpty()) {
-                                                                        ReactionBadge(symbol = "😢", list = sads)
-                                                                    }
-                                                                }
-                                                            }
                                                         }
                                                     }
                                                 }
@@ -1120,28 +1097,6 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        // Quick reactions row
-                                                        Row(
-                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            modifier = Modifier
-                                                                .background(Color(0xFF2C2C2C), RoundedCornerShape(12.dp))
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                        ) {
-                                                            listOf("👍" to "like", "👎" to "dislike", "😢" to "sad").forEach { (emoji, rType) ->
-                                                                Text(
-                                                                    text = emoji,
-                                                                    fontSize = 13.sp,
-                                                                    modifier = Modifier
-                                                                        .clickable {
-                                                                            viewModel.reactMessage(messageId = m.id, isDm = false, reaction = rType)
-                                                                            expandedMessageId = null
-                                                                        }
-                                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                                )
-                                                            }
-                                                        }
-
                                                         // Reply inline action
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
@@ -1152,7 +1107,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                                     replyingToMessage = m
                                                                     expandedMessageId = null
                                                                 }
-                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                                .padding(horizontal = 12.dp, vertical = 6.dp)
                                                         ) {
                                                             Icon(
                                                                 imageVector = Icons.Default.Reply,
@@ -1309,8 +1264,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFF090909))
-                                    .navigationBarsPadding()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1340,7 +1294,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                         chatMessage = it
                                         viewModel.setTypingStatus(roomId, 0, it.isNotEmpty())
                                     },
-                                    placeholder = { Text(if (sync.myMuteStatus) "Sessiz modundasınız..." else "Mesaj yaz veya link yapıştır...", color = Color(0xFF6E6E6E), fontSize = 12.sp) },
+                                    placeholder = { Text(if (sync.myMuteStatus) "Sessiz modundasınız..." else "Mesaj yaz", color = Color(0xFF6E6E6E), fontSize = 15.sp) },
                                     singleLine = true,
                                     enabled = !sync.myMuteStatus,
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -1371,7 +1325,8 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                         focusedTextColor = Color.White,
                                         unfocusedTextColor = Color.White
                                     ),
-                                    shape = RoundedCornerShape(12.dp),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp),
+                                    shape = RoundedCornerShape(18.dp),
                                     modifier = Modifier.weight(1f)
                                 )
                                 
@@ -1606,7 +1561,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                                 text = { Text("➕ Arkadaş Ekle", color = Color.White) },
                                                                 onClick = {
                                                                     showMenu = false
-                                                                    viewModel.handleFriendAction(p.username, "send")
+                                                                    viewModel.handleFriendAction(p.username, "send_request")
                                                                 }
                                                             )
                                                         }
