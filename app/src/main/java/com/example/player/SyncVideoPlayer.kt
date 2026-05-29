@@ -33,6 +33,9 @@ import androidx.media3.ui.PlayerView
 import com.example.viewmodel.RaveViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
 
 fun extractYouTubeId(url: String): String? {
     val cleanUrl = url.trim()
@@ -94,6 +97,36 @@ fun SyncVideoPlayer(
                 isFullscreen = isFullscreen,
                 isFullscreenToggle = isFullscreenToggle
             )
+        }
+
+        // "Sync Active" high density badge at top-left
+        if (cleanUrl.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .background(Color.White, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(Color.Black, CircleShape)
+                    )
+                    Text(
+                        text = "SYNC ACTIVE",
+                        color = Color.Black,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
         }
     }
 }

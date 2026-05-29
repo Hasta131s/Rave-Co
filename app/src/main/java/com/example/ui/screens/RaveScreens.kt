@@ -39,6 +39,205 @@ import com.example.viewmodel.Screen
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 
+@Composable
+fun RaveLogoCircle(size: Int = 32) {
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .background(Color.White, CircleShape)
+            .border(1.dp, Color.Black.copy(alpha = 0.2f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "RC",
+            color = Color.Black,
+            fontWeight = FontWeight.Black,
+            fontSize = (size * 0.38f).sp
+        )
+    }
+}
+
+@Composable
+fun RaveHeader(
+    title: String,
+    roomText: String? = null,
+    onBackClick: (() -> Unit)? = null,
+    rightContent: @Composable (RowScope.() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF090909))
+            .statusBarsPadding()
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (onBackClick != null) {
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri Git", tint = Color.White, modifier = Modifier.size(20.dp))
+                }
+            } else {
+                RaveLogoCircle(32)
+            }
+            
+            Column {
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    lineHeight = 16.sp
+                )
+                if (roomText != null) {
+                    Text(
+                        text = roomText,
+                        fontSize = 10.sp,
+                        color = Color.LightGray,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        }
+        
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            rightContent?.invoke(this)
+        }
+    }
+}
+
+@Composable
+fun RaveSyncStatusBar() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF020202))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.04f)))
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "API ENDPOINT: bosforlab.online/v1/sync",
+            color = Color(0xFF888888),
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontSize = 8.sp,
+            letterSpacing = (-0.2).sp
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(5.dp)
+                    .background(Color(0xFF00FF66), CircleShape)
+            )
+            Text(
+                text = "14ms Ping",
+                color = Color(0xFFBBBBBB),
+                fontWeight = FontWeight.Bold,
+                fontSize = 8.sp,
+                letterSpacing = 1.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun RaveModToolsBar(
+    onMuteRoomClick: () -> Unit = {},
+    onModerateAllClick: () -> Unit = {}
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black)
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)))
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Row(
+            modifier = Modifier
+                .background(Color(0xFF1E1E1E), RoundedCornerShape(4.dp))
+                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), RoundedCornerShape(4.dp))
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Shield,
+                contentDescription = "Shield",
+                tint = Color.LightGray,
+                modifier = Modifier.size(10.dp)
+            )
+            Text(
+                text = "MOD TOOLS",
+                color = Color.White,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(12.dp)
+                .background(Color.White.copy(alpha = 0.1f))
+        )
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(Color(0xFF121212), CircleShape)
+                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), CircleShape)
+                    .clickable { onMuteRoomClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MicOff,
+                    contentDescription = "Mute Room",
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(Color(0xFF121212), CircleShape)
+                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), CircleShape)
+                    .clickable { onModerateAllClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Group,
+                    contentDescription = "Moderate Room",
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+    }
+}
+
 // DEFINED AVATARS (Emojis paired with styling colors)
 val AVATARS = listOf(
     "avatar1" to Triple("🐼", "Neon Panda", Color(0xFFE0E0E0)),
@@ -102,6 +301,8 @@ fun LoginScreen(viewModel: RaveViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
+            RaveLogoCircle(64)
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Rave Co",
                 fontSize = 40.sp,
@@ -198,6 +399,8 @@ fun RegisterScreen(viewModel: RaveViewModel) {
             modifier = Modifier.fillMaxWidth()
         ) {
             item {
+                RaveLogoCircle(64)
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "RAVE CO",
                     fontSize = 32.sp,
@@ -329,35 +532,21 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Rave Co",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    letterSpacing = 2.sp
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = { viewModel.navigateTo(Screen.DmsList) }) {
-                        Icon(imageVector = Icons.Default.ChatBubble, contentDescription = "Mesajlar", tint = Color.White)
+            RaveHeader(
+                title = "Rave Co.",
+                roomText = "Aktif Odalar",
+                rightContent = {
+                    IconButton(onClick = { viewModel.navigateTo(Screen.DmsList) }, modifier = Modifier.size(36.dp)) {
+                        Icon(imageVector = Icons.Default.ChatBubble, contentDescription = "Mesajlar", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
-                    IconButton(onClick = { viewModel.navigateTo(Screen.Friends) }) {
-                        Icon(imageVector = Icons.Default.People, contentDescription = "Arkadaşlar", tint = Color.White)
+                    IconButton(onClick = { viewModel.navigateTo(Screen.Friends) }, modifier = Modifier.size(36.dp)) {
+                        Icon(imageVector = Icons.Default.People, contentDescription = "Arkadaşlar", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
-                    IconButton(onClick = { viewModel.navigateTo(Screen.Profile) }) {
-                        Icon(imageVector = Icons.Default.Person, contentDescription = "Profil", tint = Color.White)
+                    IconButton(onClick = { viewModel.navigateTo(Screen.Profile) }, modifier = Modifier.size(36.dp)) {
+                        Icon(imageVector = Icons.Default.Person, contentDescription = "Profil", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                 }
-            }
+            )
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -371,12 +560,19 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
         },
         containerColor = Color.Black
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(Color.Black)
         ) {
+            RaveSyncStatusBar()
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+            ) {
             if (rooms.isEmpty()) {
                 Column(
                     modifier = Modifier
@@ -416,8 +612,8 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { viewModel.joinRoom(r.id) },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
-                            border = BorderStroke(1.dp, Color.DarkGray)
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0C0C)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
                         ) {
                             Row(
                                 modifier = Modifier.padding(16.dp),
@@ -480,6 +676,7 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
                 }
             }
         }
+    }
 
         // CREATE ROOM MODAL Dialog
         if (isCreateOpen) {
@@ -745,56 +942,97 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                 }
                             }
 
-                            // Message Composer
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = Color.Black),
-                                border = BorderStroke(1.dp, Color.DarkGray)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .navigationBarsPadding()
-                                        .padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    OutlinedTextField(
-                                        value = chatMessage,
-                                        onValueChange = { chatMessage = it },
-                                        placeholder = { Text(if (sync.myMuteStatus) "Sessiz modundasınız..." else "Mesaj yazın...", color = Color.DarkGray) },
-                                        singleLine = true,
-                                        enabled = !sync.myMuteStatus,
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                        keyboardActions = KeyboardActions(onSend = {
-                                            if (chatMessage.isNotEmpty()) {
-                                                viewModel.sendRoomMessage(roomId, chatMessage)
-                                                chatMessage = ""
-                                            }
-                                        }),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = Color.White,
-                                            unfocusedBorderColor = Color.DarkGray,
-                                            focusedTextColor = Color.White,
-                                            unfocusedTextColor = Color.White
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    IconButton(
-                                        onClick = {
-                                            if (chatMessage.isNotEmpty()) {
-                                                viewModel.sendRoomMessage(roomId, chatMessage)
-                                                chatMessage = ""
-                                            }
-                                        },
-                                        enabled = !sync.myMuteStatus && chatMessage.isNotEmpty(),
-                                        colors = IconButtonDefaults.iconButtonColors(
-                                            contentColor = Color.Black,
-                                            containerColor = Color.White,
-                                            disabledContainerColor = Color.DarkGray
-                                        )
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Send, contentDescription = "Gönder")
+                            // Mod tools bar
+                            if (isOwnerOrMod) {
+                                RaveModToolsBar(
+                                    onMuteRoomClick = {
+                                        viewModel.sendRoomMessage(roomId, "system_mute_all:Herkes")
+                                    },
+                                    onModerateAllClick = {
+                                        currentTab = 1
                                     }
+                                )
+                            }
+
+                            // Message Composer (High Density style from design)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF090909))
+                                    .navigationBarsPadding()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Add button
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(Color(0xFF1C1C1C), RoundedCornerShape(12.dp))
+                                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            viewModel.showToast("Görsel/Video veya link ekleme desteği aktif!")
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Ekle",
+                                        tint = Color.LightGray,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                
+                                OutlinedTextField(
+                                    value = chatMessage,
+                                    onValueChange = { chatMessage = it },
+                                    placeholder = { Text(if (sync.myMuteStatus) "Sessiz modundasınız..." else "Mesaj yaz veya link yapıştır...", color = Color(0xFF6E6E6E), fontSize = 12.sp) },
+                                    singleLine = true,
+                                    enabled = !sync.myMuteStatus,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                    keyboardActions = KeyboardActions(onSend = {
+                                        if (chatMessage.isNotEmpty()) {
+                                            viewModel.sendRoomMessage(roomId, chatMessage)
+                                            chatMessage = ""
+                                        }
+                                    }),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.White.copy(alpha = 0.3f),
+                                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                                        focusedContainerColor = Color(0xFF141414),
+                                        unfocusedContainerColor = Color(0xFF141414),
+                                        disabledContainerColor = Color(0xFF0E0E0E),
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                
+                                // Send button
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(
+                                            if (!sync.myMuteStatus && chatMessage.isNotEmpty()) Color.White else Color(0xFF1E1E1E),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .border(
+                                            BorderStroke(1.dp, Color.White.copy(alpha = if (chatMessage.isNotEmpty()) 0.2f else 0.05f)),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable(enabled = !sync.myMuteStatus && chatMessage.isNotEmpty()) {
+                                            viewModel.sendRoomMessage(roomId, chatMessage)
+                                            chatMessage = ""
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = "Gönder",
+                                        tint = if (!sync.myMuteStatus && chatMessage.isNotEmpty()) Color.Black else Color.LightGray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -980,25 +1218,11 @@ fun FriendsScreen(viewModel: RaveViewModel) {
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black)
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { viewModel.navigateBack() }) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri Git", tint = Color.White)
-                }
-                Text(
-                    text = "Sosyal & Arkadaşlar",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
+            RaveHeader(
+                title = "Sosyal & Arkadaşlar",
+                roomText = "Arkadaş Ekleme ve Sosyal Ağ",
+                onBackClick = { viewModel.navigateBack() }
+            )
         },
         containerColor = Color.Black
     ) { innerPadding ->
@@ -1186,25 +1410,11 @@ fun DmsListScreen(viewModel: RaveViewModel) {
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black)
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { viewModel.navigateBack() }) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri Git", tint = Color.White)
-                }
-                Text(
-                    text = "Sohbetler ve DM",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
+            RaveHeader(
+                title = "Sohbetler ve DM",
+                roomText = "Özel mesaj kutusu",
+                onBackClick = { viewModel.navigateBack() }
+            )
         },
         containerColor = Color.Black
     ) { innerPadding ->
@@ -1330,27 +1540,14 @@ fun DmChatScreen(
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black)
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { viewModel.navigateBack() }) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri Git", tint = Color.White)
+            RaveHeader(
+                title = partnerUsername,
+                roomText = "Birebir Özel Mesajlaşma",
+                onBackClick = { viewModel.navigateBack() },
+                rightContent = {
+                    AvatarBadge(avatarKey = partnerAvatar, size = 32)
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                AvatarBadge(avatarKey = partnerAvatar, size = 36)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = partnerUsername,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+            )
         },
         containerColor = Color.Black
     ) { innerPadding ->
@@ -1396,46 +1593,77 @@ fun DmChatScreen(
                 }
             }
 
-            // Input Bar
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Black),
-                border = BorderStroke(1.dp, Color.DarkGray)
+            // Input Bar (High Density Style)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF090909))
+                    .navigationBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
+                // Add button
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = messageText,
-                        onValueChange = { messageText = it },
-                        placeholder = { Text("Özel mesaj yazın...", color = Color.DarkGray) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.White,
-                            unfocusedBorderColor = Color.DarkGray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(
-                        onClick = {
-                            if (messageText.isNotEmpty()) {
-                                viewModel.sendDmMessage(partnerId, messageText)
-                                messageText = ""
-                            }
+                        .size(40.dp)
+                        .background(Color(0xFF1C1C1C), RoundedCornerShape(12.dp))
+                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)), RoundedCornerShape(12.dp))
+                        .clickable {
+                            viewModel.showToast("Özel görsel/dosya ekleme yakında aktif!")
                         },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Ekle",
+                        tint = Color.LightGray,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Özel mesaj yazın...", color = Color(0xFF6E6E6E), fontSize = 12.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White.copy(alpha = 0.3f),
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                        focusedContainerColor = Color(0xFF141414),
+                        unfocusedContainerColor = Color(0xFF141414),
+                        disabledContainerColor = Color(0xFF0E0E0E),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Send button
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            if (messageText.isNotEmpty()) Color.White else Color(0xFF1E1E1E),
+                            RoundedCornerShape(12.dp)
                         )
-                    ) {
-                        Icon(imageVector = Icons.Default.Send, contentDescription = "Gönder")
-                    }
+                        .border(
+                            BorderStroke(1.dp, Color.White.copy(alpha = if (messageText.isNotEmpty()) 0.2f else 0.05f)),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable(enabled = messageText.isNotEmpty()) {
+                            viewModel.sendDmMessage(partnerId, messageText)
+                            messageText = ""
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "Gönder",
+                        tint = if (messageText.isNotEmpty()) Color.Black else Color.LightGray,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
         }
@@ -1455,25 +1683,11 @@ fun ProfileScreen(viewModel: RaveViewModel) {
 
     Scaffold(
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black)
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { viewModel.navigateBack() }) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri Git", tint = Color.White)
-                }
-                Text(
-                    text = "Profil Yönetimi",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
+            RaveHeader(
+                title = "Profil Yönetimi",
+                roomText = "Avatar, Şifre ve Bağlantı Ayarları",
+                onBackClick = { viewModel.navigateBack() }
+            )
         },
         containerColor = Color.Black
     ) { innerPadding ->

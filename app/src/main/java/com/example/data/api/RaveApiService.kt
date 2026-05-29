@@ -127,15 +127,27 @@ object RaveApiFactory {
     fun getApiUrl(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         var url = prefs.getString(KEY_API_URL, DEFAULT_API_URL) ?: DEFAULT_API_URL
-        if (!url.endsWith("/")) {
-            url += "/"
+        var cleaned = url.trim()
+        if (cleaned.endsWith("api.php")) {
+            cleaned = cleaned.substring(0, cleaned.length - "api.php".length)
+        } else if (cleaned.contains("/api.php")) {
+            cleaned = cleaned.replace("/api.php", "")
         }
-        return url
+        if (!cleaned.endsWith("/")) {
+            cleaned += "/"
+        }
+        return cleaned
     }
 
     fun setApiUrl(context: Context, url: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val formatted = if (url.endsWith("/")) url else "$url/"
+        var cleaned = url.trim()
+        if (cleaned.endsWith("api.php")) {
+            cleaned = cleaned.substring(0, cleaned.length - "api.php".length)
+        } else if (cleaned.contains("/api.php")) {
+            cleaned = cleaned.replace("/api.php", "")
+        }
+        val formatted = if (cleaned.endsWith("/")) cleaned else "$cleaned/"
         prefs.edit().putString(KEY_API_URL, formatted).apply()
     }
 
