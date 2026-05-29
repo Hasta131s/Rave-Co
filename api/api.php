@@ -201,6 +201,41 @@ try {
     try {
         $db->exec("ALTER TABLE room_messages ADD COLUMN is_deleted INT DEFAULT 0;");
     } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE room_messages ADD COLUMN reactions TEXT DEFAULT NULL;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE direct_messages ADD COLUMN is_deleted INT DEFAULT 0;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE direct_messages ADD COLUMN reactions TEXT DEFAULT NULL;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE room_participants ADD COLUMN is_typing INT DEFAULT 0;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE room_participants ADD COLUMN typing_until INT DEFAULT 0;");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE rooms ADD COLUMN chat_locked INT DEFAULT 0;");
+    } catch (Exception $e) {}
+    try {
+        if (USE_SQLITE) {
+            $db->exec("CREATE TABLE IF NOT EXISTS dm_typing (
+                user_id INTEGER,
+                partner_id INTEGER,
+                typing_until INTEGER,
+                PRIMARY KEY (user_id, partner_id)
+            );");
+        } else {
+            $db->exec("CREATE TABLE IF NOT EXISTS dm_typing (
+                user_id INT,
+                partner_id INT,
+                typing_until BIGINT,
+                PRIMARY KEY (user_id, partner_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        }
+    } catch (Exception $e) {}
 
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'error' => 'Database initialization error: ' . $e->getMessage()]);
@@ -711,6 +746,7 @@ switch ($action) {
         
         $new_messages = [];
         foreach ($new_messages_raw as $m) {
+            $reactMap = json_decode($m['reactions'] ?? '', true) ?: ['like' => [], 'dislike' => [], 'sad' => []];
             $new_messages[] = [
                 'id' => (int)$m['id'],
                 'roomId' => (int)$m['room_id'],
@@ -723,10 +759,43 @@ switch ($action) {
                 'isDeleted' => isset($m['is_deleted']) ? (int)$m['is_deleted'] === 1 : false,
                 'replyToId' => isset($m['reply_to_id']) ? (int)$m['reply_to_id'] : null,
                 'replyToName' => isset($m['reply_to_name']) ? $m['reply_to_name'] : null,
-                'replyToMsg' => isset($m['reply_to_msg']) ? $m['reply_to_msg'] : null
+                'replyToMsg' => isset($m['reply_to_msg']) ? $m['reply_to_msg'] : null,
+                'likeReacts' => isset($reactMap['like']) ? array_values($reactMap['like']) : [],
+                'dislikeReacts' => isset($reactMap['dislike']) ? array_values($reactMap['dislike']) : [],
+                'sadReacts' => isset($reactMap['sad']) ? array_values($reactMap['sad']) : []
             ];
         }
         
+        // Fetch typing status
+        $stmt_t_u = $db->prepare("
+            SELECT u.username FROM room_participants rp
+            JOIN users u ON rp.user_id = u.id
+            WHERE rp.room_id = :rid AND rp.is_typing = 1 AND rp.typing_until > :now AND rp.user_id != :uid
+        ");
+        $stmt_t_u->execute([':rid' => $roomId, ':now' => time(), ':uid' => $userId]);
+        $typing_list = $stmt_t_u->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        // Fetch kicked status
+        $kicked_list = [];
+        if ($can_control) {
+            $stmt_kd = $db->prepare("
+                SELECT ku.user_id, u.username, u.avatar FROM kicked_users ku
+                JOIN users u ON ku.user_id = u.id
+                WHERE ku.room_id = :rid
+            ");
+            $stmt_kd->execute([':rid' => $roomId]);
+            $kd_raw = $stmt_kd->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($kd_raw as $kr) {
+                $kicked_list[] = [
+                    'userId' => (int)$kr['user_id'],
+                    'username' => $kr['username'],
+                    'avatar' => $kr['avatar']
+                ];
+            }
+        }
+
+        $isChatLocked = isset($room['chat_locked']) && (int)$room['chat_locked'] === 1;
+
         // Sync response
         respond(true, [
             'sync' => [
@@ -740,7 +809,10 @@ switch ($action) {
                 'myRole' => $role,
                 'myMuteStatus' => $isMuted,
                 'participants' => $participants,
-                'newMessages' => $new_messages
+                'newMessages' => $new_messages,
+                'typingUsers' => $typing_list,
+                'kickedUsers' => $kicked_list,
+                'isChatLocked' => $isChatLocked
             ]
         ]);
         break;
@@ -838,6 +910,24 @@ switch ($action) {
             respond(false, [], "Yetersiz yetki (Sadece oda sahibi veya moderatörler yapabilir).");
         }
         
+        if ($command === 'unkick' || $command === 'unban') {
+            $stmt_u_name = $db->prepare("SELECT username FROM users WHERE id = :id");
+            $stmt_u_name->execute([':id' => $targetId]);
+            $target_username = $stmt_u_name->fetchColumn() ?: 'Kullanıcı';
+            
+            $del = $db->prepare("DELETE FROM kicked_users WHERE room_id = :rid AND user_id = :uid");
+            $del->execute([':rid' => $roomId, ':uid' => $targetId]);
+            
+            $sys_stmt = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, NULL, :msg, 1, :ts)");
+            $sys_stmt->execute([
+                ':rid' => $roomId,
+                ':msg' => "system_unban:" . $target_username,
+                ':ts' => time()
+            ]);
+            
+            respond(true, ['message' => 'Uzaklaştırma kaldırıldı.']);
+        }
+
         // Fetch target role
         $stmt_t = $db->prepare("SELECT role FROM room_participants WHERE room_id = :rid AND user_id = :uid");
         $stmt_t->execute([':rid' => $roomId, ':uid' => $targetId]);
@@ -1118,6 +1208,7 @@ switch ($action) {
         
         $messages = [];
         foreach ($messages_raw as $m) {
+            $reactMap = json_decode($m['reactions'] ?? '', true) ?: ['like' => [], 'dislike' => [], 'sad' => []];
             $messages[] = [
                 'id' => (int)$m['id'],
                 'senderId' => (int)$m['sender_id'],
@@ -1126,11 +1217,23 @@ switch ($action) {
                 'senderAvatar' => $m['sender_avatar'],
                 'message' => $m['message'],
                 'timestamp' => (int)$m['timestamp'],
-                'isRead' => (int)$m['is_read'] === 1
+                'isRead' => (int)$m['is_read'] === 1,
+                'isDeleted' => isset($m['is_deleted']) && (int)$m['is_deleted'] === 1,
+                'likeReacts' => isset($reactMap['like']) ? array_values($reactMap['like']) : [],
+                'dislikeReacts' => isset($reactMap['dislike']) ? array_values($reactMap['dislike']) : [],
+                'sadReacts' => isset($reactMap['sad']) ? array_values($reactMap['sad']) : []
             ];
         }
         
-        respond(true, ['messages' => $messages]);
+        // Check if partner is typing
+        $stmt_dm_typing = $db->prepare("SELECT COUNT(*) FROM dm_typing WHERE user_id = :p AND partner_id = :u AND typing_until > :now");
+        $stmt_dm_typing->execute([':p' => $partnerId, ':u' => $userId, ':now' => time()]);
+        $is_partner_typing = (int)$stmt_dm_typing->fetchColumn() > 0;
+        
+        respond(true, [
+            'messages' => $messages,
+            'isPartnerTyping' => $is_partner_typing
+        ]);
         break;
 
     case 'send_dm':
@@ -1184,6 +1287,143 @@ switch ($action) {
         }
         
         respond(true, ['newDMs' => $out]);
+        break;
+
+    case 'delete_dm_message':
+        $userId = (int)($input['userId'] ?? 0);
+        $messageId = (int)($input['messageId'] ?? 0);
+        if ($userId <= 0 || $messageId <= 0) {
+            respond(false, [], "Geçersiz silme verisi.");
+        }
+        $stmt_msg = $db->prepare("SELECT * FROM direct_messages WHERE id = :mid");
+        $stmt_msg->execute([':mid' => $messageId]);
+        $msg = $stmt_msg->fetch(PDO::FETCH_ASSOC);
+        if (!$msg) {
+            respond(false, [], "Mesaj bulunamadı.");
+        }
+        if ((int)$msg['sender_id'] !== $userId) {
+            respond(false, [], "Bu mesajı silme yetkiniz yok.");
+        }
+        $upd = $db->prepare("UPDATE direct_messages SET is_deleted = 1, message = 'Bu mesaj silindi.' WHERE id = :mid");
+        $upd->execute([':mid' => $messageId]);
+        respond(true, ['message' => 'Sohbet mesajı silindi.']);
+        break;
+
+    case 'react_message':
+        $userId = (int)($input['userId'] ?? 0);
+        $messageId = (int)($input['messageId'] ?? 0);
+        $isDm = (int)($input['isDm'] ?? 0); // 0 = Room, 1 = DM
+        $reaction = trim($input['reaction'] ?? ''); // like, dislike, sad
+        
+        if ($userId <= 0 || $messageId <= 0 || empty($reaction)) {
+            respond(false, [], "Geçersiz reaksiyon verisi.");
+        }
+        
+        $table = $isDm ? 'direct_messages' : 'room_messages';
+        
+        // Get current reactions
+        $stmt = $db->prepare("SELECT reactions FROM $table WHERE id = :id");
+        $stmt->execute([':id' => $messageId]);
+        $current_react_str = $stmt->fetchColumn() ?: '';
+        
+        $reacts = json_decode($current_react_str, true) ?: ['like' => [], 'dislike' => [], 'sad' => []];
+        if (!isset($reacts['like'])) $reacts['like'] = [];
+        if (!isset($reacts['dislike'])) $reacts['dislike'] = [];
+        if (!isset($reacts['sad'])) $reacts['sad'] = [];
+        
+        // Get author name
+        $stmt_u = $db->prepare("SELECT username FROM users WHERE id = :uid");
+        $stmt_u->execute([':uid' => $userId]);
+        $username = $stmt_u->fetchColumn() ?: 'User';
+        
+        // Toggle reaction
+        // Remove from all reactions first to allow only one reaction per user
+        $reacts['like'] = array_values(array_diff($reacts['like'], [$username]));
+        $reacts['dislike'] = array_values(array_diff($reacts['dislike'], [$username]));
+        $reacts['sad'] = array_values(array_diff($reacts['sad'], [$username]));
+        
+        // Check if the previous reaction map had the user in this specific action
+        $had_this_reaction = false;
+        $old_reacts = json_decode($current_react_str, true);
+        if ($old_reacts && isset($old_reacts[$reaction]) && in_array($username, $old_reacts[$reaction])) {
+            $had_this_reaction = true;
+        }
+        
+        if (!$had_this_reaction) {
+            $reacts[$reaction][] = $username;
+        }
+        
+        $new_react_str = json_encode($reacts);
+        $upd = $db->prepare("UPDATE $table SET reactions = :r WHERE id = :id");
+        $upd->execute([':r' => $new_react_str, ':id' => $messageId]);
+        
+        respond(true, [
+            'likeReacts' => array_values($reacts['like']),
+            'dislikeReacts' => array_values($reacts['dislike']),
+            'sadReacts' => array_values($reacts['sad'])
+        ]);
+        break;
+
+    case 'set_typing_status':
+        $userId = (int)($input['userId'] ?? 0);
+        $roomId = (int)($input['roomId'] ?? 0);
+        $partnerId = (int)($input['partnerId'] ?? 0); // For DMs
+        $isTyping = (int)($input['isTyping'] ?? 0);
+        
+        if ($userId <= 0) respond(false, [], "Geçersiz kullanıcı.");
+        
+        $now = time();
+        $until = $isTyping ? ($now + 5) : 0;
+        
+        if ($roomId > 0) {
+            $upd = $db->prepare("UPDATE room_participants SET is_typing = :it, typing_until = :tu WHERE room_id = :rid AND user_id = :uid");
+            $upd->execute([':it' => $isTyping, ':tu' => $until, ':rid' => $roomId, ':uid' => $userId]);
+        } else if ($partnerId > 0) {
+            if (USE_SQLITE) {
+                $upd = $db->prepare("INSERT OR REPLACE INTO dm_typing (user_id, partner_id, typing_until) VALUES (:u, :p, :tu)");
+                $upd->execute([':u' => $userId, ':p' => $partnerId, ':tu' => $until]);
+            } else {
+                $upd = $db->prepare("INSERT INTO dm_typing (user_id, partner_id, typing_until) VALUES (:u, :p, :tu) ON DUPLICATE KEY UPDATE typing_until = :tu2");
+                $upd->execute([':u' => $userId, ':p' => $partnerId, ':tu' => $until, ':tu2' => $until]);
+            }
+        }
+        respond(true);
+        break;
+
+    case 'toggle_chat_lock':
+        $userId = (int)($input['userId'] ?? 0);
+        $roomId = (int)($input['roomId'] ?? 0);
+        
+        if ($userId <= 0 || $roomId <= 0) respond(false, [], "Geçersiz veri.");
+        
+        // Check if owner or moderator
+        $stmt_my = $db->prepare("SELECT role FROM room_participants WHERE room_id = :rid AND user_id = :uid");
+        $stmt_my->execute([':rid' => $roomId, ':uid' => $userId]);
+        $role = $stmt_my->fetchColumn();
+        
+        if ($role !== 'owner' && $role !== 'moderator') {
+            respond(false, [], "Yetersiz yetki.");
+        }
+        
+        // Select current status
+        $stmt_room = $db->prepare("SELECT chat_locked FROM rooms WHERE id = :rid");
+        $stmt_room->execute([':rid' => $roomId]);
+        $current_locked = (int)$stmt_room->fetchColumn();
+        
+        $new_locked = $current_locked ? 0 : 1;
+        $upd_room = $db->prepare("UPDATE rooms SET chat_locked = :l WHERE id = :rid");
+        $upd_room->execute([':l' => $new_locked, ':rid' => $roomId]);
+        
+        // Insert system message about chat lock
+        $sys_msg = $new_locked ? "system_chat_lock_on" : "system_chat_lock_off";
+        $sys_stmt = $db->prepare("INSERT INTO room_messages (room_id, user_id, message, is_system, timestamp) VALUES (:rid, NULL, :msg, 1, :ts)");
+        $sys_stmt->execute([
+            ':rid' => $roomId,
+            ':msg' => $sys_msg,
+            ':ts' => time()
+        ]);
+        
+        respond(true, ['chatLocked' => ($new_locked === 1)]);
         break;
 
     default:

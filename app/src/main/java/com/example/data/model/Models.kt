@@ -75,7 +75,10 @@ data class RoomMessage(
     val isDeleted: Boolean? = null,
     val replyToId: Int? = null,
     val replyToName: String? = null,
-    val replyToMsg: String? = null
+    val replyToMsg: String? = null,
+    val likeReacts: List<String>? = null,
+    val dislikeReacts: List<String>? = null,
+    val sadReacts: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -90,7 +93,10 @@ data class SyncState(
     val myRole: String,
     val myMuteStatus: Boolean,
     val participants: List<RoomParticipant>,
-    val newMessages: List<RoomMessage>
+    val newMessages: List<RoomMessage>,
+    val typingUsers: List<String>? = null,
+    val kickedUsers: List<Friend>? = null,
+    val isChatLocked: Boolean? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -145,14 +151,19 @@ data class DMMessage(
     val senderAvatar: String,
     val message: String,
     val timestamp: Long,
-    val isRead: Boolean
+    val isRead: Boolean,
+    val isDeleted: Boolean? = null,
+    val likeReacts: List<String>? = null,
+    val dislikeReacts: List<String>? = null,
+    val sadReacts: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class DMMessagesResponse(
     val success: Boolean,
     val error: String? = null,
-    val messages: List<DMMessage>? = null
+    val messages: List<DMMessage>? = null,
+    val isPartnerTyping: Boolean? = null
 )
 
 @JsonClass(generateAdapter = true)

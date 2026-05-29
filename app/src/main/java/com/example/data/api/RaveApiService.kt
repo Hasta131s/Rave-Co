@@ -82,6 +82,30 @@ interface RaveApiService {
     ): BaseResponse
 
     @POST("api.php")
+    suspend fun deleteDmMessage(
+        @Query("action") action: String = "delete_dm_message",
+        @Body body: Map<String, Int>
+    ): BaseResponse
+
+    @POST("api.php")
+    suspend fun reactMessage(
+        @Query("action") action: String = "react_message",
+        @Body body: Map<String, @JvmSuppressWildcards Any>
+    ): BaseResponse
+
+    @POST("api.php")
+    suspend fun setTypingStatus(
+        @Query("action") action: String = "set_typing_status",
+        @Body body: Map<String, Int>
+    ): BaseResponse
+
+    @POST("api.php")
+    suspend fun toggleChatLock(
+        @Query("action") action: String = "toggle_chat_lock",
+        @Body body: Map<String, Int>
+    ): BaseResponse
+
+    @POST("api.php")
     suspend fun moderateRoom(
         @Query("action") action: String = "room_moderate",
         @Body body: Map<String, @JvmSuppressWildcards Any>

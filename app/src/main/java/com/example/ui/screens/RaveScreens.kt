@@ -161,7 +161,9 @@ fun RaveSyncStatusBar() {
 
 @Composable
 fun RaveModToolsBar(
+    isChatLocked: Boolean = false,
     onMuteRoomClick: () -> Unit = {},
+    onToggleChatLock: () -> Unit = {},
     onModerateAllClick: () -> Unit = {}
 ) {
     Row(
@@ -221,6 +223,21 @@ fun RaveModToolsBar(
                     contentDescription = "Mute Room",
                     tint = Color.LightGray,
                     modifier = Modifier.size(12.dp)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(Color(0xFF121212), CircleShape)
+                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), CircleShape)
+                    .clickable { onToggleChatLock() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isChatLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                    contentDescription = "Chat Lock",
+                    tint = if (isChatLocked) RedWarning else Color.LightGray,
+                    modifier = Modifier.size(11.dp)
                 )
             }
             Box(
@@ -770,6 +787,8 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     var activeMenuMessage by remember { mutableStateOf<com.example.data.model.RoomMessage?>(null) }
     var expandedMessageId by remember { mutableStateOf<Int?>(null) }
     var replyingToMessage by remember { mutableStateOf<com.example.data.model.RoomMessage?>(null) }
+    var showInviteDialog by remember { mutableStateOf(false) }
+    var msgToTargetPid by remember { mutableStateOf<com.example.data.model.RoomParticipant?>(null) }
     val context = LocalContext.current
 
     DisposableEffect(isFullscreen) {
@@ -1055,6 +1074,28 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                                 fontSize = 13.sp,
                                                                 fontStyle = if (m.isDeleted == true) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
                                                             )
+                                                            
+                                                            val likes = m.likeReacts ?: emptyList()
+                                                            val dislikes = m.dislikeReacts ?: emptyList()
+                                                            val sads = m.sadReacts ?: emptyList()
+
+                                                            if ((m.isDeleted != true) && (likes.isNotEmpty() || dislikes.isNotEmpty() || sads.isNotEmpty())) {
+                                                                Row(
+                                                                    modifier = Modifier.padding(top = 4.dp),
+                                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    if (likes.isNotEmpty()) {
+                                                                        ReactionBadge(symbol = "👍", list = likes)
+                                                                    }
+                                                                    if (dislikes.isNotEmpty()) {
+                                                                        ReactionBadge(symbol = "👎", list = dislikes)
+                                                                    }
+                                                                    if (sads.isNotEmpty()) {
+                                                                        ReactionBadge(symbol = "😢", list = sads)
+                                                                    }
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -1066,6 +1107,28 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
+                                                        // Quick reactions row
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            modifier = Modifier
+                                                                .background(Color(0xFF2C2C2C), RoundedCornerShape(12.dp))
+                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        ) {
+                                                            listOf("👍" to "like", "👎" to "dislike", "😢" to "sad").forEach { (emoji, rType) ->
+                                                                Text(
+                                                                    text = emoji,
+                                                                    fontSize = 13.sp,
+                                                                    modifier = Modifier
+                                                                        .clickable {
+                                                                            viewModel.reactMessage(messageId = m.id, isDm = false, reaction = rType)
+                                                                            expandedMessageId = null
+                                                                        }
+                                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                )
+                                                            }
+                                                        }
+
                                                         // Reply inline action
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
@@ -1157,8 +1220,12 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                             // Mod tools bar
                             if (isOwnerOrMod) {
                                 RaveModToolsBar(
+                                    isChatLocked = sync.isChatLocked == true,
                                     onMuteRoomClick = {
                                         viewModel.sendRoomMessage(roomId, "system_mute_all:Herkes")
+                                    },
+                                    onToggleChatLock = {
+                                        viewModel.toggleChatLock(roomId)
                                     },
                                     onModerateAllClick = {
                                         currentTab = 1
@@ -1205,6 +1272,26 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                 }
                             }
 
+                            // Room Typing Indicator
+                            val typingUsers = sync.typingUsers ?: emptyList()
+                            val myUsername by viewModel.username.collectAsState()
+                            val otherTyping = typingUsers.filter { it.isNotEmpty() && it != myUsername }
+                            if (otherTyping.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(modifier = Modifier.size(6.dp).background(Color.Gray, androidx.compose.foundation.shape.CircleShape))
+                                    Text(
+                                        text = "${otherTyping.joinToString(", ")} yazıyor...",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                    )
+                                }
+                            }
+
                             // Message Composer (High Density style from design)
                             Row(
                                 modifier = Modifier
@@ -1236,13 +1323,17 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                 
                                 OutlinedTextField(
                                     value = chatMessage,
-                                    onValueChange = { chatMessage = it },
+                                    onValueChange = {
+                                        chatMessage = it
+                                        viewModel.setTypingStatus(roomId, 0, it.isNotEmpty())
+                                    },
                                     placeholder = { Text(if (sync.myMuteStatus) "Sessiz modundasınız..." else "Mesaj yaz veya link yapıştır...", color = Color(0xFF6E6E6E), fontSize = 12.sp) },
                                     singleLine = true,
                                     enabled = !sync.myMuteStatus,
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                     keyboardActions = KeyboardActions(onSend = {
                                         if (chatMessage.isNotEmpty()) {
+                                            viewModel.setTypingStatus(roomId, 0, false)
                                             if (replyingToMessage != null) {
                                                 viewModel.sendRoomMessage(
                                                     roomId = roomId,
@@ -1284,6 +1375,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable(enabled = !sync.myMuteStatus && chatMessage.isNotEmpty()) {
+                                            viewModel.setTypingStatus(roomId, 0, false)
                                             if (replyingToMessage != null) {
                                                 viewModel.sendRoomMessage(
                                                     roomId = roomId,
@@ -1392,108 +1484,220 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                             }
                         }
                     } else {
-                        // PARTICIPANTS PANEL (With moderation actions)
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        // PARTICIPANTS PANEL (With moderation actions, DM chat triggering, family invite & banned lists)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
                         ) {
-                            items(sync.participants) { p ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
-                                    border = BorderStroke(1.dp, Color.DarkGray)
+                            // Invite Friends & Header row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Katılımcılar (${sync.participants.size})",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                Button(
+                                    onClick = { showInviteDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E), contentColor = Color.White),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(32.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    Icon(imageVector = Icons.Default.Share, contentDescription = "Davet Et", tint = Color.White, modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Arkadaş Davet Et", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(sync.participants) { p ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
+                                        border = BorderStroke(1.dp, Color.DarkGray)
                                     ) {
                                         Row(
+                                            modifier = Modifier.padding(12.dp),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            AvatarBadge(avatarKey = p.avatar, size = 36)
-                                            Column {
-                                                Text(
-                                                    text = p.username + if (p.userId == viewModel.userId.value) " (Sen)" else "",
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
-                                                )
-                                                Text(
-                                                    text = when (p.role) {
-                                                        "owner" -> "👑 Kurucu"
-                                                        "moderator" -> "⭐ Moderatör"
-                                                        else -> "🗣️ Katılımcı"
-                                                    } + if (p.isMuted) " • 🔇 Sessiz" else "",
-                                                    color = Color.LightGray,
-                                                    fontSize = 11.sp
-                                                )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                AvatarBadge(avatarKey = p.avatar, size = 36)
+                                                Column {
+                                                    Text(
+                                                        text = p.username + if (p.userId == currentUserId) " (Sen)" else "",
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp
+                                                    )
+                                                    Text(
+                                                        text = when (p.role) {
+                                                            "owner" -> "👑 Kurucu"
+                                                            "moderator" -> "⭐ Moderatör"
+                                                            else -> "🗣️ Katılımcı"
+                                                        } + if (p.isMuted) " • 🔇 Sessiz" else "",
+                                                        color = Color.LightGray,
+                                                        fontSize = 11.sp
+                                                    )
+                                                }
+                                            }
+
+                                            // Participant actions trigger
+                                            if (p.userId != currentUserId) {
+                                                val myFriends by viewModel.friends.collectAsState()
+                                                val isFriend = myFriends.any { it.userId == p.userId }
+                                                val myRank = sync.myRole
+                                                var showMenu by remember { mutableStateOf(false) }
+
+                                                Box {
+                                                    IconButton(onClick = { showMenu = true }) {
+                                                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Yönet", tint = Color.White)
+                                                    }
+                                                    DropdownMenu(
+                                                        expanded = showMenu,
+                                                        onDismissRequest = { showMenu = false },
+                                                        modifier = Modifier.background(Color(0xFF1E1E1E))
+                                                    ) {
+                                                        // Friend Actions
+                                                        if (isFriend) {
+                                                            DropdownMenuItem(
+                                                                text = { Text("💬 DM Gönder", color = Color.White) },
+                                                                onClick = {
+                                                                    showMenu = false
+                                                                    msgToTargetPid = p
+                                                                }
+                                                            )
+                                                            DropdownMenuItem(
+                                                                text = { Text("❌ Arkadaşlıktan Çıkar", color = Color.LightGray) },
+                                                                onClick = {
+                                                                    showMenu = false
+                                                                    viewModel.handleFriendAction(p.username, "remove")
+                                                                }
+                                                            )
+                                                        } else {
+                                                            DropdownMenuItem(
+                                                                text = { Text("➕ Arkadaş Ekle", color = Color.White) },
+                                                                onClick = {
+                                                                    showMenu = false
+                                                                    viewModel.handleFriendAction(p.username, "send")
+                                                                }
+                                                            )
+                                                        }
+
+                                                        // Moderation actions: Owner/Mod privileges
+                                                        if (isOwnerOrMod) {
+                                                            Spacer(modifier = Modifier.height(4.dp).background(Color.DarkGray))
+                                                            
+                                                            // Kick Action
+                                                            DropdownMenuItem(
+                                                                text = { Text("Odadan At (Kick)", color = RedWarning) },
+                                                                onClick = {
+                                                                    showMenu = false
+                                                                    viewModel.moderateParticipant(roomId, p.userId, "kick")
+                                                                }
+                                                            )
+                                                            // Mute / Unmute
+                                                            if (p.isMuted) {
+                                                                DropdownMenuItem(
+                                                                    text = { Text("Sesi Aç (Unmute)", color = Color.White) },
+                                                                    onClick = {
+                                                                        showMenu = false
+                                                                        viewModel.moderateParticipant(roomId, p.userId, "unmute")
+                                                                    }
+                                                                )
+                                                            } else {
+                                                                DropdownMenuItem(
+                                                                    text = { Text("Sessize Al (Mute)", color = Color.LightGray) },
+                                                                    onClick = {
+                                                                        showMenu = false
+                                                                        viewModel.moderateParticipant(roomId, p.userId, "mute")
+                                                                    }
+                                                                )
+                                                            }
+
+                                                            // Creator promotes/demotes
+                                                            if (myRank == "owner") {
+                                                                if (p.role == "moderator") {
+                                                                    DropdownMenuItem(
+                                                                        text = { Text("Moderatörlüğü Kaldır (Demote)", color = Color.LightGray) },
+                                                                        onClick = {
+                                                                            showMenu = false
+                                                                            viewModel.moderateParticipant(roomId, p.userId, "demote")
+                                                                        }
+                                                                    )
+                                                                } else if (p.role == "member") {
+                                                                    DropdownMenuItem(
+                                                                        text = { Text("Moderatör Yap (Promote)", color = Color.White) },
+                                                                        onClick = {
+                                                                            showMenu = false
+                                                                            viewModel.moderateParticipant(roomId, p.userId, "promote")
+                                                                        }
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
+                                    }
+                                }
 
-                                        // Moderation tools triggered only by higher rankings
-                                        if (p.userId != viewModel.userId.value && isOwnerOrMod) {
-                                            val myRank = sync.myRole
-                                            var showMenu by remember { mutableStateOf(false) }
-
-                                            Box {
-                                                IconButton(onClick = { showMenu = true }) {
-                                                    Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Yönet", tint = Color.White)
-                                                }
-                                                DropdownMenu(
-                                                    expanded = showMenu,
-                                                    onDismissRequest = { showMenu = false },
-                                                    modifier = Modifier.background(Color(0xFF1E1E1E))
+                                // Yasaklılar / Kicked Users list rendering
+                                val kickedList = sync.kickedUsers ?: emptyList()
+                                if (isOwnerOrMod && kickedList.isNotEmpty()) {
+                                    item {
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        Text(
+                                            text = "Banlı Kullanıcılar (Kicked)",
+                                            color = RedWarning,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                    }
+                                    items(kickedList) { k ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFF181111)),
+                                            border = BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.3f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
-                                                    // Kick Action
-                                                    DropdownMenuItem(
-                                                        text = { Text("Odadan At (Kick)", color = RedWarning) },
-                                                        onClick = {
-                                                            showMenu = false
-                                                            viewModel.moderateParticipant(roomId, p.userId, "kick")
-                                                        }
-                                                    )
-                                                    // Mute / Unmute
-                                                    if (p.isMuted) {
-                                                        DropdownMenuItem(
-                                                            text = { Text("Sesi Aç (Unmute)", color = Color.White) },
-                                                            onClick = {
-                                                                showMenu = false
-                                                                viewModel.moderateParticipant(roomId, p.userId, "unmute")
-                                                            }
-                                                        )
-                                                    } else {
-                                                        DropdownMenuItem(
-                                                            text = { Text("Sessize Al (Mute)", color = Color.LightGray) },
-                                                            onClick = {
-                                                                showMenu = false
-                                                                viewModel.moderateParticipant(roomId, p.userId, "mute")
-                                                            }
-                                                        )
-                                                    }
-
-                                                    // Promoter configs only for room owner
-                                                    if (myRank == "owner") {
-                                                        if (p.role == "moderator") {
-                                                            DropdownMenuItem(
-                                                                text = { Text("Moderatörlüğü Kaldır (Demote)", color = Color.LightGray) },
-                                                                onClick = {
-                                                                    showMenu = false
-                                                                    viewModel.moderateParticipant(roomId, p.userId, "demote")
-                                                                }
-                                                            )
-                                                        } else if (p.role == "member") {
-                                                            DropdownMenuItem(
-                                                                text = { Text("Moderatör Yap (Promote)", color = Color.White) },
-                                                                onClick = {
-                                                                    showMenu = false
-                                                                    viewModel.moderateParticipant(roomId, p.userId, "promote")
-                                                                }
-                                                            )
-                                                        }
-                                                    }
+                                                    AvatarBadge(avatarKey = k.avatar, size = 30)
+                                                    Text(k.username, color = Color.White, fontSize = 13.sp)
+                                                }
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.moderateParticipant(roomId, k.userId, "unkick")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray, contentColor = Color.White),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(26.dp),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text("Engeli Kaldır", fontSize = 10.sp)
                                                 }
                                             }
                                         }
@@ -1504,6 +1708,115 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                     }
                 }
             }
+        }
+
+        // Direct Message dialog from Within room
+        if (msgToTargetPid != null) {
+            val target = msgToTargetPid!!
+            var customDMText by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { msgToTargetPid = null },
+                title = { Text("${target.username} ile Sohbet Başlat", color = Color.White) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Birebir doğrudan mesaj yazın:", color = Color.LightGray, fontSize = 12.sp)
+                        OutlinedTextField(
+                            value = customDMText,
+                            onValueChange = { customDMText = it },
+                            placeholder = { Text("Özel mesajınız...", color = Color.Gray) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = Color(0xFF1E1E1E),
+                                unfocusedContainerColor = Color(0xFF1E1E1E)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (customDMText.isNotEmpty()) {
+                                viewModel.sendDmMessage(target.userId, customDMText)
+                                viewModel.showToast("Mesaj başarıyla gönderildi!")
+                                msgToTargetPid = null
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                    ) {
+                        Text("Gönder", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { msgToTargetPid = null }) {
+                        Text("İptal", color = Color.White)
+                    }
+                },
+                containerColor = Color(0xFF141414)
+            )
+        }
+
+        // Invite Friends to Watch dialog
+        if (showInviteDialog) {
+            val friendsList by viewModel.friends.collectAsState()
+            
+            // Auto refresh friends
+            LaunchedEffect(Unit) {
+                viewModel.loadFriends()
+            }
+            
+            AlertDialog(
+                onDismissRequest = { showInviteDialog = false },
+                title = { Text("Arkadaşlarımı Davet Et", color = Color.White) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (friendsList.isEmpty()) {
+                            Text("Davet edilecek kayıtlı arkadaşınız bulunamadı. Önce profil/arkadaşlar kısmından arkadaş edinin!", color = Color.Gray, fontSize = 13.sp)
+                        } else {
+                            Text("Arkadaşlarınıza doğrudan izleme bağlantısı göndermek için seçin:", color = Color.LightGray, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LazyColumn(
+                                modifier = Modifier.heightIn(max = 240.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(friendsList) { f ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                val directLink = "Hadi benimle ${sync.videoTitle.ifEmpty { "bu içeriği" }} izle! Oda ID: $roomId"
+                                                viewModel.sendDmMessage(f.userId, directLink)
+                                                viewModel.showToast("${f.username} davet edildi!")
+                                                showInviteDialog = false
+                                            }
+                                            .padding(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            AvatarBadge(avatarKey = f.avatar, size = 32)
+                                            Text(f.username, color = Color.White, fontSize = 13.sp)
+                                        }
+                                        Text("Davet Et ➔", color = Color.LightGray, fontSize = 10.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showInviteDialog = false }) {
+                        Text("Kapat", color = Color.White)
+                    }
+                },
+                containerColor = Color(0xFF141414)
+            )
         }
 
         // SETTINGS DIALOG (Source URL updates)
@@ -1979,6 +2292,18 @@ fun DmChatScreen(
                 }
             }
 
+            val isPartnerTyping by viewModel.isPartnerTyping.collectAsState()
+            if (isPartnerTyping) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(6.dp).background(Color.Gray, androidx.compose.foundation.shape.CircleShape))
+                    Text("$partnerUsername yazıyor...", color = Color.Gray, fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                }
+            }
+
             // Input Bar (High Density Style)
             Row(
                 modifier = Modifier
@@ -2010,7 +2335,10 @@ fun DmChatScreen(
 
                 OutlinedTextField(
                     value = messageText,
-                    onValueChange = { messageText = it },
+                    onValueChange = {
+                        messageText = it
+                        viewModel.setTypingStatus(0, partnerId, it.isNotEmpty())
+                    },
                     placeholder = { Text("Özel mesaj yazın...", color = Color(0xFF6E6E6E), fontSize = 12.sp) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -2039,6 +2367,7 @@ fun DmChatScreen(
                             RoundedCornerShape(12.dp)
                         )
                         .clickable(enabled = messageText.isNotEmpty()) {
+                            viewModel.setTypingStatus(0, partnerId, false)
                             viewModel.sendDmMessage(partnerId, messageText)
                             messageText = ""
                         },
@@ -2276,5 +2605,17 @@ fun ProfileScreen(viewModel: RaveViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ReactionBadge(symbol: String, list: List<String>) {
+    Box(
+        modifier = Modifier
+            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(12.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(text = "$symbol ${list.size}", color = Color.White, fontSize = 10.sp)
     }
 }

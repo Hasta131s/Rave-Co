@@ -75,6 +75,9 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
     private val _dmMessages = MutableStateFlow<List<DMMessage>>(emptyList())
     val dmMessages: StateFlow<List<DMMessage>> = _dmMessages.asStateFlow()
 
+    private val _isPartnerTyping = MutableStateFlow(false)
+    val isPartnerTyping: StateFlow<Boolean> = _isPartnerTyping.asStateFlow()
+
     // PLAYER RECEPTACLES
     var currentPlaybackTime = 0.0f
     var isPlaying = false
@@ -605,6 +608,7 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                 val resp = service.getDmMessages(body = mapOf("userId" to uid, "partnerId" to partnerId))
                 if (resp.success && resp.messages != null) {
                     _dmMessages.value = resp.messages
+                    _isPartnerTyping.value = resp.isPartnerTyping ?: false
                 }
             } catch (e: Exception) {
                 Log.e("RaveCo", "Failed to load Dm Messages", e)
@@ -659,6 +663,107 @@ class RaveViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 delay(6000) // Poll for notifications background/foreground safely every 6 seconds
+            }
+        }
+    }
+
+    fun deleteDmMessage(messageId: Int, partnerId: Int) {
+        val uid = _userId.value ?: return
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                val resp = service.deleteDmMessage(body = mapOf("userId" to uid, "messageId" to messageId))
+                if (resp.success) {
+                    showToast("Mesaj silindi.")
+                    loadDmMessages(partnerId)
+                } else {
+                    showToast(resp.error ?: "Mesaj silinemedi.")
+                }
+            } catch (e: Exception) {
+                showToast("Bağlantı hatası.")
+            }
+        }
+    }
+
+    fun reactMessage(messageId: Int, isDm: Boolean, reaction: String, partnerId: Int = 0) {
+        val uid = _userId.value ?: return
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                val resp = service.reactMessage(
+                    body = mapOf(
+                        "userId" to uid,
+                        "messageId" to messageId,
+                        "isDm" to (if (isDm) 1 else 0),
+                        "reaction" to reaction
+                    )
+                )
+                if (resp.success) {
+                    if (isDm && partnerId > 0) {
+                        loadDmMessages(partnerId)
+                    } else {
+                        // Refresh room sync immediately
+                        _roomSyncState.value?.roomId?.let { rid ->
+                            val currentRoomDetails = _roomSyncState.value
+                            val currentPos = currentPlaybackTime
+                            val isPlayingNow = isPlaying
+                            val payload = mutableMapOf<String, Any>(
+                                "userId" to uid,
+                                "roomId" to rid,
+                                "playbackTime" to currentPos,
+                                "isPlaying" to (if (isPlayingNow) 1 else 0),
+                                "lastMessageId" to (currentRoomDetails?.newMessages?.lastOrNull()?.id ?: 0)
+                            )
+                            val syncResp = service.roomSync(body = payload)
+                            if (syncResp.success && syncResp.sync != null) {
+                                _roomSyncState.value = syncResp.sync
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    fun setTypingStatus(roomId: Int, partnerId: Int, isTyping: Boolean) {
+        val uid = _userId.value ?: return
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                service.setTypingStatus(
+                    body = mapOf(
+                        "userId" to uid,
+                        "roomId" to roomId,
+                        "partnerId" to partnerId,
+                        "isTyping" to (if (isTyping) 1 else 0)
+                    )
+                )
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    fun toggleChatLock(roomId: Int) {
+        val uid = _userId.value ?: return
+        viewModelScope.launch {
+            try {
+                val service = RaveApiFactory.getService(context)
+                val resp = service.toggleChatLock(
+                    body = mapOf(
+                        "userId" to uid,
+                        "roomId" to roomId
+                    )
+                )
+                if (resp.success) {
+                    showToast("Sohbet kilidi değiştirildi.")
+                } else {
+                    showToast(resp.error ?: "Sohbet kilidi değiştirilemedi.")
+                }
+            } catch (e: Exception) {
+                showToast("Sohbet kilidi değiştirilemedi: Bağlantı hatası.")
             }
         }
     }

@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +44,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.SolidColor
+
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Deferred
+import java.util.concurrent.TimeUnit
 
 val IconFullscreen = ImageVector.Builder(
     name = "Fullscreen",
@@ -339,7 +352,21 @@ fun ExoPlayerCompose(
     val syncState by viewModel.roomSyncState.collectAsState()
     val isOwner = syncState?.myRole == "owner" || syncState?.myRole == "moderator"
 
-    val exoPlayer = remember(videoUrl) {
+    // Quality states
+    var testedQualities by remember(videoUrl) { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var selectedQualityUrl by remember(videoUrl) { mutableStateOf(videoUrl) }
+    var selectedQualityLabel by remember(videoUrl) { mutableStateOf("Varsayılan") }
+    var showQualityMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(videoUrl) {
+        checkUrlQuality(videoUrl) { qList ->
+            testedQualities = qList
+            val fallbackMatch = qList.firstOrNull { it.second == videoUrl }?.first
+            selectedQualityLabel = fallbackMatch ?: "Varsayılan"
+        }
+    }
+
+    val exoPlayer = remember(context) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .setAllowCrossProtocolRedirects(true)
@@ -354,27 +381,40 @@ fun ExoPlayerCompose(
             .build().apply {
                 playWhenReady = true
                 repeatMode = Player.REPEAT_MODE_OFF
-                val cleanedUrl = videoUrl.trim()
-                val lowercaseUrl = cleanedUrl.lowercase()
-                val isHls = lowercaseUrl.contains("m3u8") || lowercaseUrl.contains("hls") || lowercaseUrl.contains(".m3u") || lowercaseUrl.contains("/chunk") || lowercaseUrl.contains("stream-resolution")
-                val isDash = lowercaseUrl.contains(".mpd") || lowercaseUrl.contains("dash")
-                
-                val mediaItem = if (isHls) {
-                    MediaItem.Builder()
-                        .setUri(Uri.parse(cleanedUrl))
-                        .setMimeType("application/x-mpegURL")
-                        .build()
-                } else if (isDash) {
-                    MediaItem.Builder()
-                        .setUri(Uri.parse(cleanedUrl))
-                        .setMimeType("application/dash+xml")
-                        .build()
-                } else {
-                    MediaItem.fromUri(Uri.parse(cleanedUrl))
-                }
-                setMediaItem(mediaItem)
-                prepare()
             }
+    }
+
+    // Dynamic stream swapper without destroying player instance
+    LaunchedEffect(selectedQualityUrl) {
+        val currentPos = exoPlayer.currentPosition
+        val isPlayingNow = exoPlayer.isPlaying
+        
+        val cleanedUrl = selectedQualityUrl.trim()
+        val lowercaseUrl = cleanedUrl.lowercase()
+        val isHls = lowercaseUrl.contains("m3u8") || lowercaseUrl.contains("hls") || lowercaseUrl.contains(".m3u") || lowercaseUrl.contains("/chunk") || lowercaseUrl.contains("stream-resolution")
+        val isDash = lowercaseUrl.contains(".mpd") || lowercaseUrl.contains("dash")
+        
+        val mediaItem = if (isHls) {
+            MediaItem.Builder()
+                .setUri(Uri.parse(cleanedUrl))
+                .setMimeType("application/x-mpegURL")
+                .build()
+        } else if (isDash) {
+            MediaItem.Builder()
+                .setUri(Uri.parse(cleanedUrl))
+                .setMimeType("application/dash+xml")
+                .build()
+        } else {
+            MediaItem.fromUri(Uri.parse(cleanedUrl))
+        }
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
+        if (currentPos > 0) {
+            exoPlayer.seekTo(currentPos)
+        }
+        if (isPlayingNow) {
+            exoPlayer.play()
+        }
     }
 
     // Monitor Player changes to push up to viewmodel state if Owner
@@ -442,7 +482,7 @@ fun ExoPlayerCompose(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
-                    useController = true // Standard Seek control is native and robust
+                    useController = true
                     layoutParams = FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
@@ -456,13 +496,52 @@ fun ExoPlayerCompose(
             }
         )
 
-        // Polished Floating overlay buttons for manual/forced sync or Fullscreen triggers
+        // Polished Floating overlay buttons for manual/forced sync, quality, and Fullscreen triggers
         Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            if (testedQualities.size > 1) {
+                Box {
+                    Button(
+                        onClick = { showQualityMenu = !showQualityMenu },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Black.copy(alpha = 0.6f)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Kalite",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(selectedQualityLabel, color = Color.White, fontSize = 11.sp)
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showQualityMenu,
+                        onDismissRequest = { showQualityMenu = false },
+                        modifier = Modifier.background(Color(0xFF212121))
+                    ) {
+                        testedQualities.forEach { (qLabel, qUrl) ->
+                            DropdownMenuItem(
+                                text = { Text(qLabel, color = Color.White, fontSize = 13.sp) },
+                                onClick = {
+                                    selectedQualityUrl = qUrl
+                                    selectedQualityLabel = qLabel
+                                    showQualityMenu = false
+                                    viewModel.showToast("$qLabel kalitesi seçildi.")
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             IconButton(
                 onClick = {
                     syncState?.let {
@@ -491,10 +570,134 @@ fun ExoPlayerCompose(
                 )
             }
         }
+
+        // FULLSCREEN QUICK MESSAGES / TEASER OVERLAY (Request 8)
+        if (isFullscreen) {
+            val quickMessages = listOf("vayamk", "tmm", "evet", "ayn", "✔️", "hyr", "süper", "şaka")
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 60.dp) // Safely above system gesture/exo bottom bars
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Hazır Mesaj Gönder",
+                    color = Color.LightGray,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    quickMessages.forEach { msg ->
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFF333333), RoundedCornerShape(8.dp))
+                                .clickable {
+                                    syncState?.roomId?.let { rid ->
+                                        viewModel.sendRoomMessage(roomId = rid, msg = msg)
+                                        viewModel.showToast("\"$msg\" gönderildi.")
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = msg,
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun MatchParentHeight(): androidx.compose.ui.unit.Dp {
     return 10000.dp // High threshold for layout stretches
+}
+
+fun checkUrlQuality(baseUrl: String, onFinished: (List<Pair<String, String>>) -> Unit) {
+    if (baseUrl.isEmpty()) {
+        onFinished(emptyList())
+        return
+    }
+    
+    // Check if the URL has a typical quality indicator segment
+    // We match: 240, 360, 480, 576, 720, 1080, 1440, 2160 (or e.g. 720.m3u8, 1080p, etc.)
+    var regex = "(360|480|720|1080)\\.(m3u8|mp4|mpd|m3u)".toRegex()
+    var matchResult = regex.find(baseUrl)
+    
+    if (matchResult == null) {
+        regex = "/(240|360|480|576|720|1080|1440|2160)/".toRegex()
+        matchResult = regex.find(baseUrl)
+    }
+    if (matchResult == null) {
+        regex = "\\b(240|360|480|576|720|1080|1440|2160)\\b".toRegex()
+        matchResult = regex.find(baseUrl)
+    }
+    
+    if (matchResult == null) {
+        // Return original if no indicator found
+        onFinished(listOf("Orijinal" to baseUrl))
+        return
+    }
+    
+    val matchedVal = matchResult.groupValues[1]
+    val qualitiesToTest = listOf("360", "480", "720", "1080")
+    
+    CoroutineScope(Dispatchers.IO).launch {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(3, TimeUnit.SECONDS)
+            .readTimeout(3, TimeUnit.SECONDS)
+            .build()
+            
+        val results = qualitiesToTest.map { q ->
+            async {
+                val testUrl = baseUrl.replace(matchedVal, q)
+                try {
+                    val request = Request.Builder()
+                        .url(testUrl)
+                        .head() // Try HEAD request for speed
+                        .build()
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            return@async q + "p" to testUrl
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Try simple GET if HEAD failed/is disabled on CDN
+                    try {
+                        val request = Request.Builder()
+                            .url(testUrl)
+                            .get()
+                            .build()
+                        client.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) {
+                                return@async q + "p" to testUrl
+                            }
+                        }
+                    } catch (ex: Exception) {
+                        // ignore
+                    }
+                }
+                null
+            }
+        }.awaitAll().filterNotNull()
+        
+        withContext(Dispatchers.Main) {
+            if (results.isEmpty()) {
+                onFinished(listOf("Orijinal" to baseUrl))
+            } else {
+                onFinished(results)
+            }
+        }
+    }
 }
