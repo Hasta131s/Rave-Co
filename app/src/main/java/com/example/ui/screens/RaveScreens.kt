@@ -1850,8 +1850,11 @@ fun DmChatScreen(
     val listState = rememberLazyListState()
 
     // Load DM Messages Polling
-    LaunchedEffect(Unit) {
-        viewModel.loadDmMessages(partnerId)
+    LaunchedEffect(partnerId) {
+        while (true) {
+            viewModel.loadDmMessages(partnerId)
+            kotlinx.coroutines.delay(1500)
+        }
     }
 
     LaunchedEffect(dmMessages.size) {

@@ -113,8 +113,7 @@ fun SyncVideoPlayer(
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .then(if (isFullscreen) Modifier.fillMaxHeight() else Modifier.height(230.dp))
+            .then(if (isFullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(230.dp))
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
