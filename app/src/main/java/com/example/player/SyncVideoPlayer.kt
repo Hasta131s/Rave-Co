@@ -295,8 +295,16 @@ fun ExoPlayerCompose(
         ExoPlayer.Builder(context).build().apply {
             playWhenReady = true
             repeatMode = Player.REPEAT_MODE_OFF
-            val item = MediaItem.fromUri(Uri.parse(videoUrl))
-            setMediaItem(item)
+            val isHls = videoUrl.contains(".m3u8") || videoUrl.contains("hls")
+            val mediaItem = if (isHls) {
+                MediaItem.Builder()
+                    .setUri(Uri.parse(videoUrl))
+                    .setMimeType("application/x-mpegURL")
+                    .build()
+            } else {
+                MediaItem.fromUri(Uri.parse(videoUrl))
+            }
+            setMediaItem(mediaItem)
             prepare()
         }
     }
@@ -319,6 +327,11 @@ fun ExoPlayerCompose(
                 if (isOwner) {
                     viewModel.currentPlaybackTime = exoPlayer.currentPosition / 1000.0f
                 }
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                android.util.Log.e("SyncVideoPlayer", "Playback error: ${error.message}", error)
+                viewModel.showToast("Video oynatılamadı veya ağ bağlantısı yok.")
             }
         }
         exoPlayer.addListener(listener)
