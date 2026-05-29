@@ -155,35 +155,7 @@ fun SyncVideoPlayer(
             )
         }
 
-        // "Sync Active" high density badge at top-left
-        if (cleanUrl.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .background(Color.White, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(Color.Black, CircleShape)
-                    )
-                    Text(
-                        text = "SYNC ACTIVE",
-                        color = Color.Black,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
-        }
+
     }
 }
 
@@ -330,8 +302,12 @@ fun YouTubePlayerCompose(
                     webViewRef = this
                 }
             },
-            update = {
-                // Updated
+            update = { webView ->
+                val previousVideoId = webView.tag as? String
+                if (previousVideoId != videoId) {
+                    webView.tag = videoId
+                    webView.loadDataWithBaseURL("https://www.youtube.com", htmlContent, "text/html", "utf-8", null)
+                }
             }
         )
 
@@ -472,6 +448,11 @@ fun ExoPlayerCompose(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
+                }
+            },
+            update = { playerView ->
+                if (playerView.player != exoPlayer) {
+                    playerView.player = exoPlayer
                 }
             }
         )

@@ -750,8 +750,51 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     var isFullscreen by remember { mutableStateOf(false) }
     val currentUserId by viewModel.userId.collectAsState()
     var activeMenuMessage by remember { mutableStateOf<com.example.data.model.RoomMessage?>(null) }
+    var expandedMessageId by remember { mutableStateOf<Int?>(null) }
     var replyingToMessage by remember { mutableStateOf<com.example.data.model.RoomMessage?>(null) }
     val context = LocalContext.current
+
+    DisposableEffect(isFullscreen) {
+        val activity = context as? android.app.Activity
+        if (activity != null) {
+            if (isFullscreen) {
+                activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    activity.window.decorView.windowInsetsController?.let { controller ->
+                        controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                        controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    activity.window.decorView.systemUiVisibility = (
+                        android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    )
+                }
+            } else {
+                activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    activity.window.decorView.windowInsetsController?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                } else {
+                    @Suppress("DEPRECATION")
+                    activity.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                }
+            }
+        }
+        onDispose {
+            val act = context as? android.app.Activity
+            if (act != null) {
+                act.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    act.window.decorView.windowInsetsController?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                } else {
+                    @Suppress("DEPRECATION")
+                    act.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                }
+            }
+        }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     val chatListState = rememberLazyListState()
@@ -914,7 +957,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     if (m.isDeleted != true) {
-                                                        activeMenuMessage = m
+                                                        expandedMessageId = if (expandedMessageId == m.id) null else m.id
                                                     }
                                                 }
                                                 .padding(horizontal = 4.dp, vertical = 4.dp)
@@ -980,6 +1023,96 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                             fontSize = 13.sp,
                                                             fontStyle = if (m.isDeleted == true) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
                                                         )
+                                                    }
+                                                }
+
+                                                // Dynamic inline action buttons when clicked
+                                                if (expandedMessageId == m.id) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        // Reply inline action
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                            modifier = Modifier
+                                                                .background(Color(0xFF2C2C2C), RoundedCornerShape(12.dp))
+                                                                .clickable {
+                                                                    replyingToMessage = m
+                                                                    expandedMessageId = null
+                                                                }
+                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Reply,
+                                                                contentDescription = "Yanıtla",
+                                                                tint = Color.White,
+                                                                modifier = Modifier.size(11.dp)
+                                                            )
+                                                            Text(
+                                                                text = "Yanıtla",
+                                                                color = Color.White,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Medium
+                                                            )
+                                                        }
+                                                        // Copy inline action
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                            modifier = Modifier
+                                                                .background(Color(0xFF2C2C2C), RoundedCornerShape(12.dp))
+                                                                .clickable {
+                                                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                                    val clip = android.content.ClipData.newPlainText("rave_msg", m.message)
+                                                                    clipboard.setPrimaryClip(clip)
+                                                                    viewModel.showToast("Mesaj kopyalandı!")
+                                                                    expandedMessageId = null
+                                                                }
+                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.ContentCopy,
+                                                                contentDescription = "Kopyala",
+                                                                tint = Color.White,
+                                                                modifier = Modifier.size(11.dp)
+                                                            )
+                                                            Text(
+                                                                text = "Kopyala",
+                                                                color = Color.White,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Medium
+                                                            )
+                                                        }
+                                                        // Delete inline action
+                                                        if (m.userId == currentUserId || isOwnerOrMod) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                                modifier = Modifier
+                                                                    .background(Color(0xFFE53935), RoundedCornerShape(12.dp))
+                                                                    .clickable {
+                                                                        viewModel.deleteRoomMessage(roomId, m.id)
+                                                                        expandedMessageId = null
+                                                                    }
+                                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Delete,
+                                                                    contentDescription = "Mesajı Sil",
+                                                                    tint = Color.White,
+                                                                    modifier = Modifier.size(11.dp)
+                                                                )
+                                                                Text(
+                                                                    text = "Sil",
+                                                                    color = Color.White,
+                                                                    fontSize = 10.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1144,7 +1277,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                             }
 
                             // Centered Interactive Options Dialog Menu
-                            if (activeMenuMessage != null) {
+                            if (false && activeMenuMessage != null) {
                                 val msg = activeMenuMessage!!
                                 AlertDialog(
                                     onDismissRequest = { activeMenuMessage = null },
