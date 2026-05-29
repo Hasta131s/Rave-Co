@@ -1,0 +1,6 @@
+{
+  "name": "Rave Co",
+  "description": "Eş zamanlı film/video izleme, anlık sohbet, arkadaşlık ve gelişmiş oda moderasyonu sağlayan sosyal eğlence uygulaması.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
