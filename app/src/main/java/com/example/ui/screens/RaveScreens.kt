@@ -370,29 +370,31 @@ fun LoginScreen(viewModel: RaveViewModel) {
                 text = "Rave Co",
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 letterSpacing = 4.sp
             )
             Text(
                 text = "Eş Zamanlı Hayat",
                 fontSize = 12.sp,
-                color = Color.DarkGray,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Kullanıcı Adı", color = Color.White) },
+                label = { Text("Kullanıcı Adı", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("login_username_input"),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = Color.DarkGray,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -400,17 +402,19 @@ fun LoginScreen(viewModel: RaveViewModel) {
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Şifre", color = Color.White) },
+                label = { Text("Şifre", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)) },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("login_password_input"),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = Color.DarkGray,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             )
             Spacer(modifier = Modifier.height(32.dp))
@@ -422,8 +426,8 @@ fun LoginScreen(viewModel: RaveViewModel) {
                     .height(50.dp)
                     .testTag("login_submit_button"),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(4.dp)
             ) {
@@ -433,7 +437,7 @@ fun LoginScreen(viewModel: RaveViewModel) {
 
             Text(
                 text = "Hesabın yok mu? Kayıt Ol",
-                color = Color.LightGray,
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 13.sp,
                 modifier = Modifier
                     .clickable { viewModel.navigateTo(Screen.Register) }
@@ -468,20 +472,20 @@ fun RegisterScreen(viewModel: RaveViewModel) {
                     text = "RAVE CO",
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     letterSpacing = 4.sp
                 )
                 Text(
                     text = "Yeni Profil Oluştur",
                     fontSize = 13.sp,
-                    color = Color.DarkGray,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
 
                 // Avatar customize selection
                 Text(
                     text = "Avatarını Seç",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.fillMaxWidth(),
@@ -522,16 +526,18 @@ fun RegisterScreen(viewModel: RaveViewModel) {
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Kullanıcı Adı", color = Color.White) },
+                    label = { Text("Kullanıcı Adı", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("register_username_input"),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                     )
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -539,17 +545,19 @@ fun RegisterScreen(viewModel: RaveViewModel) {
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Şifre", color = Color.White) },
+                    label = { Text("Şifre", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("register_password_input"),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                     )
                 )
                 Spacer(modifier = Modifier.height(32.dp))
@@ -561,8 +569,8 @@ fun RegisterScreen(viewModel: RaveViewModel) {
                         .height(50.dp)
                         .testTag("register_submit_button"),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     shape = RoundedCornerShape(4.dp)
                 ) {
@@ -572,7 +580,7 @@ fun RegisterScreen(viewModel: RaveViewModel) {
 
                 Text(
                     text = "Zaten üye misin? Giriş Yap",
-                    color = Color.LightGray,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     modifier = Modifier
                         .clickable { viewModel.navigateTo(Screen.Login) }
