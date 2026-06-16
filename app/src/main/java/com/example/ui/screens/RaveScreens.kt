@@ -283,6 +283,35 @@ fun getAvatarColor(key: String): Color {
     return AVATARS.firstOrNull { it.first == key }?.second?.third ?: Color.White
 }
 
+fun getBubbleColorForSender(senderName: String, isWhiteTheme: Boolean): Color {
+    val hash = Math.abs(senderName.hashCode())
+    if (isWhiteTheme) {
+        val lightColors = listOf(
+            Color(0xFFE8F0FE), // soft blue
+            Color(0xFFE6F4EA), // soft green
+            Color(0xFFFEF7E0), // soft yellow
+            Color(0xFFFCE8E6), // soft red
+            Color(0xFFF3E8FD), // soft purple
+            Color(0xFFE4F7FB), // soft cyan
+            Color(0xFFFFF0F5), // soft lavender
+            Color(0xFFFFF2E6)  // soft orange
+        )
+        return lightColors[hash % lightColors.size]
+    } else {
+        val darkColors = listOf(
+            Color(0xFF1B2E3C), // deep steel blue
+            Color(0xFF1B3520), // rustic green
+            Color(0xFF3B1E1E), // deep crimson
+            Color(0xFF2E1F3D), // deep violet
+            Color(0xFF2E2214), // dark amber
+            Color(0xFF103A32), // deep teal
+            Color(0xFF222428), // slate gray
+            Color(0xFF1C2237)  // deep navy
+        )
+        return darkColors[hash % darkColors.size]
+    }
+}
+
 @Composable
 fun AvatarBadge(
     avatarKey: String,
@@ -785,6 +814,8 @@ fun RoomsListScreen(viewModel: RaveViewModel) {
 @Composable
 fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
     val syncState by viewModel.roomSyncState.collectAsState()
+    val activeTheme by viewModel.appTheme.collectAsState()
+    val isWhiteTheme = activeTheme == "beyaz"
     var currentTab by rememberSaveable { mutableStateOf(0) } // 0 = Chat, 1 = Participants
     var chatMessage by rememberSaveable { mutableStateOf("") }
     var isSettingsOpen by rememberSaveable { mutableStateOf(false) }
@@ -960,7 +991,10 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                     .padding(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(sync.newMessages) { m ->
+                                items(
+                                    items = sync.newMessages,
+                                    key = { it.id }
+                                ) { m ->
                                     if (m.isSystem) {
                                         // System message formatting
                                         val sysParts = m.message.split(":")
@@ -1016,7 +1050,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text(
                                                         text = m.senderName,
-                                                        color = Color.LightGray,
+                                                        color = if (isWhiteTheme) Color.DarkGray else Color.LightGray,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 12.sp
                                                     )
@@ -1025,7 +1059,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                 Box(
                                                     modifier = Modifier
                                                         .background(
-                                                            Color(0xFF1E1E1E),
+                                                            getBubbleColorForSender(m.senderName, isWhiteTheme),
                                                             RoundedCornerShape(
                                                                 topStart = 0.dp,
                                                                 topEnd = 12.dp,
@@ -1043,21 +1077,21 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                             Row(
                                                                 modifier = Modifier
                                                                     .padding(bottom = 6.dp)
-                                                                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
-                                                                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), RoundedCornerShape(4.dp))
+                                                                    .background(if (isWhiteTheme) Color.Black.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                                                                    .border(BorderStroke(1.dp, if (isWhiteTheme) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.1f)), RoundedCornerShape(4.dp))
                                                                     .padding(horizontal = 8.dp, vertical = 4.dp),
                                                                 verticalAlignment = Alignment.CenterVertically
                                                             ) {
                                                                 Column {
                                                                     Text(
                                                                         text = "↩ $rName",
-                                                                        color = Color.LightGray,
+                                                                        color = if (isWhiteTheme) Color.DarkGray else Color.LightGray,
                                                                         fontWeight = FontWeight.Bold,
                                                                         fontSize = 10.sp
                                                                     )
                                                                     Text(
                                                                         text = rMsg,
-                                                                        color = Color.Gray,
+                                                                        color = if (isWhiteTheme) Color.DarkGray.copy(alpha = 0.8f) else Color.Gray,
                                                                         fontSize = 10.sp,
                                                                         maxLines = 1,
                                                                         overflow = TextOverflow.Ellipsis
@@ -1082,7 +1116,7 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                                             }
                                                             Text(
                                                                 text = m.message,
-                                                                color = if (m.isDeleted == true) Color.Gray else Color.White,
+                                                                color = if (m.isDeleted == true) Color.Gray else (if (isWhiteTheme) Color.Black else Color.White),
                                                                 fontSize = 15.sp,
                                                                 fontStyle = if (m.isDeleted == true) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
                                                             )
@@ -1290,9 +1324,13 @@ fun RoomViewScreen(viewModel: RaveViewModel, roomId: Int) {
                                 
                                 OutlinedTextField(
                                     value = chatMessage,
-                                    onValueChange = {
-                                        chatMessage = it
-                                        viewModel.setTypingStatus(roomId, 0, it.isNotEmpty())
+                                    onValueChange = { newValue ->
+                                        val wasEmpty = chatMessage.isEmpty()
+                                        val isEmpty = newValue.isEmpty()
+                                        chatMessage = newValue
+                                        if (wasEmpty != isEmpty) {
+                                            viewModel.setTypingStatus(roomId, 0, !isEmpty)
+                                        }
                                     },
                                     placeholder = { Text(if (sync.myMuteStatus) "Sessiz modundasınız..." else "Mesaj yaz", color = Color(0xFF6E6E6E), fontSize = 15.sp) },
                                     singleLine = true,
@@ -2311,9 +2349,13 @@ fun DmChatScreen(
 
                 OutlinedTextField(
                     value = messageText,
-                    onValueChange = {
-                        messageText = it
-                        viewModel.setTypingStatus(0, partnerId, it.isNotEmpty())
+                    onValueChange = { newValue ->
+                        val wasEmpty = messageText.isEmpty()
+                        val isEmpty = newValue.isEmpty()
+                        messageText = newValue
+                        if (wasEmpty != isEmpty) {
+                            viewModel.setTypingStatus(0, partnerId, !isEmpty)
+                        }
                     },
                     placeholder = { Text("Özel mesaj yazın...", color = Color(0xFF6E6E6E), fontSize = 12.sp) },
                     singleLine = true,
@@ -2533,7 +2575,10 @@ fun ProfileScreen(viewModel: RaveViewModel) {
                     "cyberpunk" to "Siberpunk Neon Pembe",
                     "emerald" to "Zümrüt Doğal Yeşil",
                     "sunset" to "Sıcak Gün Batımı",
-                    "midnight" to "Klasik Gece Yarısı Siyahı"
+                    "midnight" to "Klasik Gece Yarısı Siyahı",
+                    "discord" to "Discord Teması (Blurple)",
+                    "siyahbeyaz" to "Siyah Beyaz (Monokrom)",
+                    "beyaz" to "Beyaz Tema (Açık)"
                 )
                 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2570,7 +2615,10 @@ fun ProfileScreen(viewModel: RaveViewModel) {
                                                 "cyberpunk" -> Color(0xFFFF0055)
                                                 "emerald" -> Color(0xFF00D28E)
                                                 "sunset" -> Color(0xFFFF7E1D)
-                                                "midnight" -> Color(0xFFFFFFFF)
+                                                "midnight" -> Color(0xFF23272A)
+                                                "discord" -> Color(0xFF5865F2)
+                                                "siyahbeyaz" -> Color(0xFF7F7F7F)
+                                                "beyaz" -> Color(0xFFDDDDDD)
                                                 else -> Color(0xFF00FF66)
                                             },
                                             shape = androidx.compose.foundation.shape.CircleShape

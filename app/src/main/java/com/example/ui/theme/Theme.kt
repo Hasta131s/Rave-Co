@@ -107,6 +107,63 @@ private val MidnightColorScheme = darkColorScheme(
     onError = PureWhite
 )
 
+private val DiscordColorScheme = darkColorScheme(
+    primary = Color(0xFF5865F2), // Discord Blurple
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF3B449B),
+    onPrimaryContainer = Color.White,
+    secondary = Color(0xFF248046), // Discord green
+    onSecondary = Color.White,
+    tertiary = Color(0xFF4F545C),
+    onTertiary = Color.White,
+    background = Color(0xFF313338), // Discord greybg
+    onBackground = Color(0xFFF2F3F5),
+    surface = Color(0xFF2B2D31),
+    onSurface = Color(0xFFF2F3F5),
+    surfaceVariant = Color(0xFF1E1F22),
+    onSurfaceVariant = Color(0xFFB5BAC1),
+    error = Color(0xFFF23F43),
+    onError = Color.White
+)
+
+private val SiyahBeyazColorScheme = darkColorScheme(
+    primary = Color(0xFFFFFFFF),
+    onPrimary = Color(0xFF000000),
+    primaryContainer = Color(0xFF222222),
+    onPrimaryContainer = Color(0xFFFFFFFF),
+    secondary = Color(0xFF888888),
+    onSecondary = Color(0xFF000000),
+    tertiary = Color(0xFF444444),
+    onTertiary = Color(0xFFFFFFFF),
+    background = Color(0xFF000000), // Pure Black background
+    onBackground = Color(0xFFFFFFFF), // Pure White text
+    surface = Color(0xFF111111),
+    onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFF222222),
+    onSurfaceVariant = Color(0xFFFFFFFF),
+    error = Color(0xFFFFFFFF),
+    onError = Color(0xFF000000)
+)
+
+private val BeyazColorScheme = lightColorScheme(
+    primary = Color(0xFF0066FF), // clean vivid royal blue
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD6E4FF),
+    onPrimaryContainer = Color(0xFF0066FF),
+    secondary = Color(0xFF5F6368),
+    onSecondary = Color.White,
+    tertiary = Color(0xFFE0E0E0),
+    onTertiary = Color(0xFF202020),
+    background = Color(0xFFFFFFFF), // pure white background
+    onBackground = Color(0xFF1F1F1F), // dark text
+    surface = Color(0xFFF8F9FA),
+    onSurface = Color(0xFF1F1F1F),
+    surfaceVariant = Color(0xFFEDF0F2),
+    onSurfaceVariant = Color(0xFF202124),
+    error = Color(0xFFD93025),
+    onError = Color.White
+)
+
 @Composable
 fun MyApplicationTheme(
     theme: String = "cosmic",
@@ -117,6 +174,9 @@ fun MyApplicationTheme(
         "emerald" -> EmeraldColorScheme
         "sunset" -> SunsetColorScheme
         "midnight" -> MidnightColorScheme
+        "discord" -> DiscordColorScheme
+        "siyahbeyaz" -> SiyahBeyazColorScheme
+        "beyaz" -> BeyazColorScheme
         else -> CosmicColorScheme
     }
 
